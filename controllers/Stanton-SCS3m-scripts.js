@@ -46,11 +46,19 @@ StantonSCS3m.Device = function(channel) {
         }
     }
     
-    function Meter(id, units) {
+    function Meter(id, width) {
+        function lights(min, max, value) {
+            if (value <= min) return 0;
+            if (value >= max) return width;
+            return Math.max(1, Math.min(width-1, Math.round((value - min) / (max - min) * width)))
+        }
+
         return {
-            needle:    function(value) { return [CC, id, Math.round(value * units)]; },
-            centerbar: function(value) { return [CC, id, 0x15 + Math.round((value + 0.5) * units)]; },
-            bar:       function(value) { return [CC, id, 0x28 + Math.round(value * units)]; }
+            needle:    function(value) { return [CC, id, Math.round(value * width)]; },
+            centerbar: function(value) {
+                return [CC, id, 0x15 + lights(-1, 1, value)]
+            },
+            bar:       function(value) { return [CC, id, 0x28 + Math.round(value * width)]; }
         }
     }
     
@@ -155,7 +163,7 @@ StantonSCS3m.Device = function(channel) {
         left: Side('left'),
         right: Side('right'),
         master: Touch(0x0E),
-        crossfader: Slider(0x0A, 12)
+        crossfader: Slider(0x0A, 10)
     }
 }
 
