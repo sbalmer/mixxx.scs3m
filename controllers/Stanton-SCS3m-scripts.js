@@ -7,7 +7,6 @@ StantonSCS3m = {
     timer: false,
     debugging: false
 }
-print('lolw')
 
 StantonSCS3m.init = function(id, debugging) {
     this.debugging = debugging;
@@ -206,9 +205,8 @@ StantonSCS3m.Agent = function(device) {
     
     function receive(type, control, value) {
         var address = type << 8 + control;
-print(12)
+
         if (handler = receivers[address]) {
-print(23)
             handler(value);
             return;
         }
@@ -267,6 +265,13 @@ print(23)
             tell(translator(value));
         }
     }
+    
+    function binarylight(off, on) {
+        return function(value) {
+            if (value) tell(on);
+            else tell(off);
+        }
+    }
 
     // absolute control
     function set(channel, control) {
@@ -292,6 +297,15 @@ print(23)
             engine.setValue(channel, control,
                 engine.getValue(channel, control)
                 + (offset-64)/128
+            );
+        }
+    }
+    
+    // switch
+    function toggle(channel, control) {
+        return function() {
+            engine.setValue(channel, control,
+                !engine.getValue(channel, control)
             );
         }
     }
@@ -321,30 +335,30 @@ print(23)
             expect(part.deck.release, deck[side].toggle);
 
             tell(part.deck.light[deck[side].choose('first', 'second')]);
-            
+
             function either(left, right) { return (side == 'left') ? left : right }
-            function channel() {
-                // I'm either sorry or very sorry for how this reads
-                var no = deck[side].choose(either(1,2), either(3,4));
-                return '[Channel'+no+']';
-            }
-            
+
+            var no = deck[side].choose(either(1,2), either(3,4));
+            var channel = '[Channel'+no+']';
+
             if (master.engaged()) {
                 tell(part.gain.mode.relative);
-                expect(part.gain.slide, budge(channel(), 'pregain'));
-                watch(channel(), 'pregain', patch(part.gain.meter.needle));
+                expect(part.gain.slide, budge(channel, 'pregain'));
+                watch(channel, 'pregain', patch(part.gain.meter.needle));
             } else {
                 tell(part.gain.mode.absolute);
-                expect(part.gain.slide, set(channel(), 'volume'));
-                watch(channel(), 'volume', patch(part.gain.meter.bar));
+                expect(part.gain.slide, set(channel, 'volume'));
+                watch(channel, 'volume', patch(part.gain.meter.bar));
             }
+
+            watch(channel, 'pfl', binarylight(part.phones.light.blue, part.phones.light.red));
+            expect(part.phones.touch, toggle(channel, 'pfl'));
         }
-        
+
         clear();
         tell(device.logo.on);
         Side('left');
         Side('right');
-print(1)
 
         tell(device.master.light[master.choose('black', 'purple')]);
         expect(device.master.touch,   master.engage);
