@@ -162,6 +162,7 @@ StantonSCS3m.Device = function(channel) {
     
     return {
         flat: [0xF0, 0x00, 0x01, 0x60, 0x15, 0x01, 0xF7],
+        lightsoff: [CC, 0x7B, 0x00],
         logo: Logo(),
         left: Side('left'),
         right: Side('right'),
@@ -384,7 +385,13 @@ StantonSCS3m.Agent = function(device) {
         },
         tick: tick,
         receive: receive,
-        stop: clear
+        stop: function() {
+            clear();
+            tell(device.lightsoff);
+            
+            last = {}; // Oops caching interferes
+            tell(device.logo.on);
+        }
     }
 }
 
