@@ -489,5 +489,6 @@
                 </options>
             </control>
         </controls>
+        <outputs/>
     </controller>
 </MixxxControllerPreset>
