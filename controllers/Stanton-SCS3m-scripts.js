@@ -53,16 +53,19 @@ StantonSCS3m.Device = function(channel) {
         }
 
         return {
-            needle:    function(value) {
+            gainneedle: function(value) {
+                return [CC, id, lights(0.5, 1.5, value) ]; 
+            },
+            needle: function(value) {
                 return [CC, id, lights(0, 1, value) ]; 
             },
             centerbar: function(value) {
                 return [CC, id, 0x15 + lights(-1, 1, value)]
             },
-            bar:       function(value) {
+            bar: function(value) {
                 return [CC, id, 0x28 + lights(0, 0.95, value) ]; 
             },
-            vubar:       function(value) {
+            vubar: function(value) {
                 return [CC, id, 0x28 + lights(0.01, 1, value) ]; 
             }
         }
@@ -74,7 +77,8 @@ StantonSCS3m.Device = function(channel) {
             slide: [CC, id],
             mode: {
                 absolute: [CM, id, 0x70],
-                relative: [CM, id, 0x71]
+                relative: [CM, id, 0x71],
+                end:      [CM, id, 0x7F]
             }
         }
     }
@@ -357,11 +361,13 @@ StantonSCS3m.Agent = function(device) {
             var channel = '[Channel'+no+']';
 
             if (master.engaged()) {
-                tell(part.gain.mode.relative);
+                tellslowly(part.gain.mode.relative);
+                tellslowly(part.gain.mode.end);
                 expect(part.gain.slide, budge(channel, 'pregain'));
-                watch(channel, 'pregain', patch(part.gain.meter.needle));
+                watch(channel, 'pregain', patch(part.gain.meter.gainneedle));
             } else {
-                tell(part.gain.mode.absolute);
+                tellslowly(part.gain.mode.absolute);
+                tellslowly(part.gain.mode.end);
                 expect(part.gain.slide, set(channel, 'volume'));
                 watch(channel, 'volume', patch(part.gain.meter.bar));
             }
