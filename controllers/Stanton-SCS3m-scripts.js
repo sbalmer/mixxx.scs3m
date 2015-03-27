@@ -13,7 +13,7 @@ StantonSCS3m.init = function(id, debugging) {
     this.device = this.Device(0); // Assuming channel is 0 eh?
     this.agent = this.Agent(this.device);
     this.agent.start();
-    this.timer = engine.beginTimer(10, this.agent.tick);
+    this.timer = engine.beginTimer(20, this.agent.tick);
 }
 
 StantonSCS3m.shutdown = function() {
@@ -193,6 +193,7 @@ StantonSCS3m.Agent = function(device) {
     // Connected engine controls
     var watched = {};
     
+    // No operation 
     function nop() {};
     
     function clear() {
@@ -238,7 +239,7 @@ StantonSCS3m.Agent = function(device) {
 
     function tell(message) {
         if (throttling) {
-            queue.push(message);
+            pipe.push(message);
             return;
         }
         var address = (message[0] << 8) + message[1];
@@ -261,7 +262,8 @@ StantonSCS3m.Agent = function(device) {
         var message;
         if (drops.length) {
             // drop by drop
-            midi.sendShortMsg.apply(midi, drops.shift());
+            message = drops.shift();
+            midi.sendShortMsg(message[0], message[1], message[2]);
         } else {
             // Open the pipe
             throttling = false;
@@ -375,7 +377,7 @@ StantonSCS3m.Agent = function(device) {
         Side('left');
         Side('right');
 
-        tell(device.master.light[master.choose('black', 'purple')]);
+        tell(device.master.light[master.choose('blue', 'purple')]);
         expect(device.master.touch,   master.engage);
         expect(device.master.release, master.cancel);
 
