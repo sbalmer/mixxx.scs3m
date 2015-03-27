@@ -237,7 +237,7 @@ StantonSCS3m.Agent = function(device) {
             queue.push(message);
             return;
         }
-        var address = message[0] << 8 + message[1];
+        var address = (message[0] << 8) + message[1];
         
         if (last[address] === message[2]) {
             return; // Not repeating same message
