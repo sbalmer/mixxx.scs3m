@@ -61,6 +61,9 @@ StantonSCS3m.Device = function(channel) {
             },
             bar:       function(value) {
                 return [CC, id, 0x28 + lights(0, 0.95, value) ]; 
+            },
+            vubar:       function(value) {
+                return [CC, id, 0x28 + lights(0.01, 1, value) ]; 
             }
         }
     }
@@ -156,7 +159,7 @@ StantonSCS3m.Device = function(channel) {
             gain: Gain(),
             touches: Touches(),
             phones: Phones(),
-            vol: Meter(either(undefined,undefined), 8)
+            meter: Meter(either(0x0C, 0x0D), 7)
         }
     }
     
@@ -226,7 +229,7 @@ StantonSCS3m.Agent = function(device) {
         var ctrl = channel + control;
 
         if (!watched[ctrl]) {
-            engine.connectControl(channel, control, function(value) { print(value);watched[ctrl](value); });
+            engine.connectControl(channel, control, function(value) { watched[ctrl](value); });
         }
         watched[ctrl] = handler;
  
@@ -363,6 +366,8 @@ StantonSCS3m.Agent = function(device) {
 
             watch(channel, 'pfl', binarylight(part.phones.light.blue, part.phones.light.red));
             expect(part.phones.touch, toggle(channel, 'pfl'));
+            
+            watch(channel, 'VuMeter', patch(part.meter.vubar));
         }
 
         clear();
@@ -389,7 +394,8 @@ StantonSCS3m.Agent = function(device) {
             clear();
             tell(device.lightsoff);
             
-            last = {}; // Oops caching interferes
+            // Light the logo
+            last = {}; // Oops caching interfered
             tell(device.logo.on);
         }
     }
