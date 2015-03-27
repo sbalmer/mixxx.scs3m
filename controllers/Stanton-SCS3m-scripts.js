@@ -187,20 +187,23 @@ StantonSCS3m.Agent = function(device) {
     var receivers = {};
     
     // Connected engine controls
-    var watched = [];
+    var watched = {};
+    
+    function nop() {};
     
     function clear() {
         receivers = {};
         drops = [];
         pipe = [];
-        
-        var i;
-        var con;
-        for (i=0; i < watched.length; i++) {
-            con = watched[i];
-            engine.connectControl(con[0], con[1], con[2], true);
+
+        // I'd like to disconnect everything on clear, but that doesn't work when using closure callbacks, I guess I'd have to pass the callback function as string name
+        // I'd have to invent function names for all handlers
+        // Instead I'm not gonna bother and just let the callbacks do nothing
+        for (ctrl in watched) {
+            if (watched.hasOwnProperty(ctrl)) {
+                watched[ctrl] = nop;
+            }
         }
-        watched = [];
     }
     
     function receive(type, control, value) {
@@ -218,8 +221,14 @@ StantonSCS3m.Agent = function(device) {
     }
     
     function watch(channel, control, handler) {
-        watched.push([channel, control, handler]);
-        engine.connectControl(channel, control, handler);
+        // Silly indirection through registry that keeps all watched controls
+        var ctrl = channel + control;
+
+        if (!watched[ctrl]) {
+            engine.connectControl(channel, control, function(value) { print(value);watched[ctrl](value); });
+        }
+        watched[ctrl] = handler;
+ 
         engine.trigger(channel, control);
     }
 
