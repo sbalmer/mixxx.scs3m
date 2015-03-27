@@ -278,7 +278,7 @@ StantonSCS3m.Agent = function(device) {
     }
     
     // Build a handler that sends messages to the device when it receives engine values
-    // translator maps from engine values (interval [-1, 1]) to midi messages (three bytes)
+    // translator maps from engine values to midi messages (three bytes)
     function patch(translator) {
         return function(value) {
             tell(translator(value));
