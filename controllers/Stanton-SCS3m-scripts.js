@@ -240,23 +240,36 @@ StantonSCS3m.Agent = function(device) {
  
         engine.trigger(channel, control);
     }
+    
+    
+    // Send MIDI message to device
+    // Param message: list of three MIDI bytes
+    // Param force: send value regardless of last recorded state
+    // Returns whether the massage was sent
+    // False is returned if the mesage was sent before.
+    function send(message, force) {
+        var address = (message[0] << 8) + message[1];
+        
+        if (!force && last[address] === message[2]) {
+            return false; // Not repeating same message
+        }
+
+        midi.sendShortMsg(message[0], message[1], message[2]);
+
+        last[address] = message[2];
+        return true;
+    }
 
     function tell(message) {
         if (throttling) {
             pipe.push(message);
             return;
         }
-        var address = (message[0] << 8) + message[1];
         
-        if (last[address] === message[2]) {
-            return; // Not repeating same message
-        }
-
-        midi.sendShortMsg(message[0], message[1], message[2]);
-
-        last[address] = message[2];
+        send(message)
     }
     
+    // Some messages take a while to be digested by the device
     function tellslowly(message) {
         drops.push(message);
         throttling = true;
@@ -264,13 +277,21 @@ StantonSCS3m.Agent = function(device) {
 
     function tick() {
         var message;
-        if (drops.length) {
-            // drop by drop
-            message = drops.shift();
-            midi.sendShortMsg(message[0], message[1], message[2]);
-        } else {
+        var sent = false;
+        while (!sent && (message = drops.shift())) {
+            // Drop by drop
+            if (message.length > 3) {
+                midi.sendSysexMsg(message, message.length);
+                sent = true;
+            } else {
+                sent = send(message);
+            }
+        }
+        if (!sent) {
             // Open the pipe
             throttling = false;
+            
+            // And flush
             while(message = pipe.shift()) {
                 tell(message);
             }
@@ -332,9 +353,9 @@ StantonSCS3m.Agent = function(device) {
     function Switch() {
         var engaged = false;
         return {
-            'engage': function() { engaged = true; patchage(); },
-            'cancel': function() { engaged = false; patchage(); },
-            'toggle': function() { engaged = !engaged; patchage(); },
+            'engage': function() { engaged = true; repatch(); },
+            'cancel': function() { engaged = false; repatch(); },
+            'toggle': function() { engaged = !engaged; repatch(); },
             'engaged': function() { return engaged; },
             'choose': function(off, on) { return engaged ? on : off; }
         }
@@ -346,12 +367,17 @@ StantonSCS3m.Agent = function(device) {
         right: Switch() // off: channel2, on: channel4
     }
     
+    function repatch() {
+        clear();
+        patchage();
+    }
+    
     function patchage() {
         function Side(side) {
             var part = device[side];
             
-            // Switch deck/channel when button us released
-            expect(part.deck.release, deck[side].toggle);
+            // Switch deck/channel when button is touched
+            expect(part.deck.touch, deck[side].toggle);
 
             tell(part.deck.light[deck[side].choose('first', 'second')]);
 
@@ -362,12 +388,12 @@ StantonSCS3m.Agent = function(device) {
 
             if (master.engaged()) {
                 tellslowly(part.gain.mode.relative);
-                tellslowly(part.gain.mode.end);
+                tell(part.gain.mode.end);
                 expect(part.gain.slide, budge(channel, 'pregain'));
                 watch(channel, 'pregain', patch(part.gain.meter.gainneedle));
             } else {
                 tellslowly(part.gain.mode.absolute);
-                tellslowly(part.gain.mode.end);
+                tell(part.gain.mode.end);
                 expect(part.gain.slide, set(channel, 'volume'));
                 watch(channel, 'volume', patch(part.gain.meter.bar));
             }
@@ -378,7 +404,6 @@ StantonSCS3m.Agent = function(device) {
             watch(channel, 'VuMeter', patch(part.meter.vubar));
         }
 
-        clear();
         tell(device.logo.on);
         Side('left');
         Side('right');
@@ -393,7 +418,7 @@ StantonSCS3m.Agent = function(device) {
     
     return {
         start: function() {
-            midi.sendSysexMsg(device.flat, device.flat.length);
+            tellslowly(device.flat);
             patchage();
         },
         tick: tick,
@@ -401,10 +426,7 @@ StantonSCS3m.Agent = function(device) {
         stop: function() {
             clear();
             tell(device.lightsoff);
-            
-            // Light the logo
-            last = {}; // Oops caching interfered
-            tell(device.logo.on);
+            send(device.logo.on, true);
         }
     }
 }
