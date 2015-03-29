@@ -123,7 +123,7 @@ StantonSCS3m.Device = function(channel) {
         }
         
         function Pitch() {
-            return Slider(either(0x00, 0x01));
+            return Slider(either(0x00, 0x01), 6);
         }
         
         function Eq() {
@@ -463,8 +463,20 @@ StantonSCS3m.Agent = function(device) {
 
             var channelno = deck[side].choose(either(1,2), either(3,4));
             var channel = '[Channel'+channelno+']';
-
+            var effectchannel = '[QuickEffectRack1_[Channel'+channelno+']]';
             var eqsideheld = eqheld[side];
+            
+            tellslowly([
+                part.pitch.mode.absolute,
+                part.pitch.mode.end
+            ]);
+            expect(part.pitch.slide, eqsideheld.choose(
+                set(effectchannel, 'super1'),
+                reset(effectchannel, 'super1', 0.5)
+            ));
+            watch(effectchannel, 'super1', patch(part.pitch.meter.needle));
+            
+            
             expect(part.eq.high.slide, eqsideheld.choose(
                 setgain(channel, 'filterHigh'),
                 reset(channel, 'filterHigh', 1)
@@ -485,7 +497,7 @@ StantonSCS3m.Agent = function(device) {
             expect(part.modes.eq.release, repatch(eqsideheld.cancel));
             tell(part.modes.eq.light[eqsideheld.choose(fxon[channelno].choose('red', 'blue'), 'purple')]);
             
-            var fxsideheld = eqheld[side];
+            var fxsideheld = fxheld[side];
             expect(part.modes.fx.touch, repatch(both(fxsideheld.engage, fxon[channelno].engage)));
             expect(part.modes.fx.release, repatch(fxsideheld.cancel));
             tell(part.modes.fx.light[fxsideheld.choose(fxon[channelno].choose('blue', 'red'), 'purple')]);
