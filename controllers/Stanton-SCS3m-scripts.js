@@ -247,10 +247,12 @@ StantonSCS3m.Agent = function(device) {
             // ugly UGLY workaround
             // The device does not light meters again if they haven't changed from last value before resetting flat mode
             // so we tell it some bullshit values which causes awful flicker, luckily only during startup
+            // It also seems to help adding more messages?!
             // The trigger will then set things straight
             tell(watched[ctrl](1));
             tell(watched[ctrl](0.5));
             tell(watched[ctrl](0.25));
+            tell(watched[ctrl](0.125));
             tell(watched[ctrl](0));
         }
         
