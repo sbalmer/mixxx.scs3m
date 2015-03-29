@@ -353,6 +353,13 @@ StantonSCS3m.Agent = function(device) {
             else tell(off);
         }
     }
+    
+    function both(h1, h2) {
+       return function() {
+           h1();
+           h2();
+       }
+    }
 
     // absolute control
     function set(channel, control) {
@@ -380,6 +387,12 @@ StantonSCS3m.Agent = function(device) {
             engine.setValue(channel, control, val);
         }
     }
+    
+    function reset(channel, control, value) {
+        return function() {
+            engine.setValue(channel, control, value);
+        }
+    }
 
     // relative control
     function budge(channel, control) {
@@ -403,19 +416,9 @@ StantonSCS3m.Agent = function(device) {
     function Switch() {
         var engaged = false;
         return {
-            'engage': function() {
-                if (!engaged) {
-                    engaged = true;
-                    repatch();
-                }
-            },
-            'cancel': function() {
-                if (engaged) {
-                    engaged = false;
-                    repatch();
-                }
-            },
-            'toggle': function() { engaged = !engaged; repatch(); },
+            'engage': function() { engaged = true; },
+            'cancel': function() { engaged = false; },
+            'toggle': function() { engaged = !engaged; },
             'engaged': function() { return engaged; },
             'choose': function(off, on) { return engaged ? on : off; }
         }
@@ -426,11 +429,26 @@ StantonSCS3m.Agent = function(device) {
         left: Switch(), // off: channel1, on: channel3
         right: Switch() // off: channel2, on: channel4
     }
+    var fxon = {
+        1: Switch(), 2: Switch(), 3: Switch(), 4: Switch()
+    } // off: eq active, on: fx active
     
-    function repatch() {
-        throttling = true;
-        clear();
-        patchage();
+    var eqheld = {
+        left: Switch(),
+        right: Switch()
+    }
+    var fxheld = {
+        left: Switch(),
+        right: Switch()
+    }
+    
+    function repatch(handler) {
+        return function(value) {
+            throttling = true;
+            handler(value);
+            clear();
+            patchage();
+        }
     }
     
     function patchage() {
@@ -438,20 +456,39 @@ StantonSCS3m.Agent = function(device) {
             var part = device[side];
             
             // Switch deck/channel when button is touched
-            expect(part.deck.touch, deck[side].toggle);
+            expect(part.deck.touch, repatch(deck[side].toggle));
             tell(part.deck.light[deck[side].choose('first', 'second')]);
 
             function either(left, right) { return (side == 'left') ? left : right }
 
-            var no = deck[side].choose(either(1,2), either(3,4));
-            var channel = '[Channel'+no+']';
+            var channelno = deck[side].choose(either(1,2), either(3,4));
+            var channel = '[Channel'+channelno+']';
 
-            expect(part.eq.high.slide, setgain(channel, 'filterHigh'));
+            var eqsideheld = eqheld[side];
+            expect(part.eq.high.slide, eqsideheld.choose(
+                setgain(channel, 'filterHigh'),
+                reset(channel, 'filterHigh', 1)
+            ));
+            expect(part.eq.mid.slide, eqsideheld.choose(
+                setgain(channel, 'filterMid'),
+                reset(channel, 'filterMid', 1)
+            ));
+            expect(part.eq.low.slide, eqsideheld.choose(
+                setgain(channel, 'filterLow'),
+                reset(channel, 'filterLow', 1)
+            ));
             watch(channel, 'filterHigh', patch(part.eq.high.meter.centergainbar));
-            expect(part.eq.mid.slide, setgain(channel, 'filterMid'));
             watch(channel, 'filterMid', patch(part.eq.mid.meter.centergainbar));
-            expect(part.eq.low.slide, setgain(channel, 'filterLow'));
             watch(channel, 'filterLow', patch(part.eq.low.meter.centergainbar));
+
+            expect(part.modes.eq.touch, repatch(both(eqsideheld.engage, fxon[channelno].cancel)));
+            expect(part.modes.eq.release, repatch(eqsideheld.cancel));
+            tell(part.modes.eq.light[eqsideheld.choose(fxon[channelno].choose('red', 'blue'), 'purple')]);
+            
+            var fxsideheld = eqheld[side];
+            expect(part.modes.fx.touch, repatch(both(fxsideheld.engage, fxon[channelno].engage)));
+            expect(part.modes.fx.release, repatch(fxsideheld.cancel));
+            tell(part.modes.fx.light[fxsideheld.choose(fxon[channelno].choose('blue', 'red'), 'purple')]);
             
             if (master.engaged()) {
                 tellslowly([
@@ -480,8 +517,8 @@ StantonSCS3m.Agent = function(device) {
         Side('right');
 
         tell(device.master.light[master.choose('blue', 'purple')]);
-        expect(device.master.touch,   master.engage);
-        expect(device.master.release, master.cancel);
+        expect(device.master.touch,   repatch(master.engage));
+        expect(device.master.release, repatch(master.cancel));
 
         expect(device.crossfader.slide, setcenter("[Master]", "crossfader"));
         watch("[Master]", "crossfader", patch(device.crossfader.meter.centerbar));
