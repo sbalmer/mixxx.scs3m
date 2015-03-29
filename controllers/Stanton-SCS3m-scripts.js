@@ -192,7 +192,8 @@ StantonSCS3m.Agent = function(device) {
     // the device becomes confused
     var loading = true;
     var throttling = false;
-    var drops = [];
+    var slow = [];
+    var slowterm = [];
     var pipe = [];
     
     // Handlers for received messages
@@ -261,9 +262,10 @@ StantonSCS3m.Agent = function(device) {
     // Send MIDI message to device
     // Param message: list of three MIDI bytes
     // Param force: send value regardless of last recorded state
+    // Param extra: do not record message as last state
     // Returns whether the massage was sent
     // False is returned if the mesage was sent before.
-    function send(message, force) {
+    function send(message, force, extra) {
         var address = (message[0] << 8) + message[1];
         
         if (!force && last[address] === message[2]) {
@@ -272,7 +274,10 @@ StantonSCS3m.Agent = function(device) {
 
         midi.sendShortMsg(message[0], message[1], message[2]);
 
-        last[address] = message[2];
+        // Record message as sent, unless it as was a mode setting termination message 
+        if (!extra) {
+            last[address] = message[2];
+        }
         return true;
     }
 
@@ -286,23 +291,41 @@ StantonSCS3m.Agent = function(device) {
     }
     
     // Some messages take a while to be digested by the device
-    function tellslowly(message) {
-        drops.push(message);
+    // They are put into the slow queue
+    function tellslowly(messages) {
+        slow.push(messages);
         throttling = true;
     }
     
     function tick() {
         var message;
         var sent = false;
-        while (!sent && (message = drops.shift())) {
+        
+        // Send messages that terminate the previous slow command
+        // These need to be sent with delay as well
+        while (!sent && (message = slowterm.shift())) {
+            send(message, true, true);
+            sent = true;
+        }
+        
+        // Send messages where the device needs a pause after
+        while (!sent && (messages = slow.shift())) {
+            message = messages.shift();
+            
             // Drop by drop
             if (message.length > 3) {
                 midi.sendSysexMsg(message, message.length);
                 sent = true;
             } else {
                 sent = send(message);
+                
+                // Only send termination commands if the command itself was sent
+                if (sent) {
+                    slowterm = messages;
+                }
             }
         }
+
         if (!sent) {
             // Open the pipe
             throttling = false;
@@ -429,13 +452,17 @@ StantonSCS3m.Agent = function(device) {
             watch(channel, 'filterLow', patch(part.eq.low.meter.centergainbar));
             
             if (master.engaged()) {
-                tellslowly(part.gain.mode.relative);
-                tellslowly(part.gain.mode.end);
+                tellslowly([
+                    part.gain.mode.relative,
+                    part.gain.mode.end
+                ]);
                 expect(part.gain.slide, budge(channel, 'pregain'));
                 watch(channel, 'pregain', patch(part.gain.meter.gainneedle));
             } else {
-                tellslowly(part.gain.mode.absolute);
-                tellslowly(part.gain.mode.end);
+                tellslowly([
+                    part.gain.mode.absolute,
+                    part.gain.mode.end
+                ]);
                 expect(part.gain.slide, set(channel, 'volume'));
                 watch(channel, 'volume', patch(part.gain.meter.bar));
             }
@@ -461,7 +488,7 @@ StantonSCS3m.Agent = function(device) {
     return {
         start: function() {
             loading = true;
-            tellslowly(device.flat);
+            tellslowly([device.flat]);
             patchage();
             loading = false;
         },
