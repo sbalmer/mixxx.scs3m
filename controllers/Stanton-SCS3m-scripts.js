@@ -186,7 +186,8 @@ StantonSCS3m.Agent = function(device) {
     
     // Keeps a queue of commands to perform
     // This is necessary because some messages must be sent with delay lest
-    // the device becomes confused 
+    // the device becomes confused
+    var loading = true;
     var throttling = false;
     var drops = [];
     var pipe = [];
@@ -237,8 +238,20 @@ StantonSCS3m.Agent = function(device) {
             engine.connectControl(channel, control, function(value) { watched[ctrl](value); });
         }
         watched[ctrl] = handler;
- 
+        
+        if (loading) {
+            // ugly UGLY workaround
+            // The device does not light meters again if they haven't changed from last value before resetting flat mode
+            // so we tell it some bullshit values which causes awful flicker, but only during startup
+            // The trigger will then set things straight
+            tell(watched[ctrl](-1));
+            tell(watched[ctrl](0));
+            tell(watched[ctrl](0.5));
+            tell(watched[ctrl](1));
+        }
+        
         engine.trigger(channel, control);
+
     }
     
     
@@ -266,7 +279,7 @@ StantonSCS3m.Agent = function(device) {
             return;
         }
         
-        send(message)
+        send(message);
     }
     
     // Some messages take a while to be digested by the device
@@ -274,7 +287,7 @@ StantonSCS3m.Agent = function(device) {
         drops.push(message);
         throttling = true;
     }
-
+    
     function tick() {
         var message;
         var sent = false;
@@ -292,7 +305,7 @@ StantonSCS3m.Agent = function(device) {
             throttling = false;
             
             // And flush
-            while(message = pipe.shift()) {
+            while (message = pipe.shift()) {
                 tell(message);
             }
         }
@@ -368,6 +381,7 @@ StantonSCS3m.Agent = function(device) {
     }
     
     function repatch() {
+        throttling = true;
         clear();
         patchage();
     }
@@ -388,12 +402,12 @@ StantonSCS3m.Agent = function(device) {
 
             if (master.engaged()) {
                 tellslowly(part.gain.mode.relative);
-                tell(part.gain.mode.end);
+                tellslowly(part.gain.mode.end);
                 expect(part.gain.slide, budge(channel, 'pregain'));
                 watch(channel, 'pregain', patch(part.gain.meter.gainneedle));
             } else {
                 tellslowly(part.gain.mode.absolute);
-                tell(part.gain.mode.end);
+                tellslowly(part.gain.mode.end);
                 expect(part.gain.slide, set(channel, 'volume'));
                 watch(channel, 'volume', patch(part.gain.meter.bar));
             }
@@ -418,8 +432,10 @@ StantonSCS3m.Agent = function(device) {
     
     return {
         start: function() {
+            loading = true;
             tellslowly(device.flat);
             patchage();
+            loading = false;
         },
         tick: tick,
         receive: receive,
