@@ -62,6 +62,9 @@ StantonSCS3m.Device = function(channel) {
             centerbar: function(value) {
                 return [CC, id, 0x15 + lights(-1, 1, value)]
             },
+            centergainbar: function(value) {
+                return [CC, id, 0x15 + lights(0, 2, value)]
+            },
             bar: function(value) {
                 return [CC, id, 0x28 + lights(0, 0.95, value) ]; 
             },
@@ -125,9 +128,9 @@ StantonSCS3m.Device = function(channel) {
         
         function Eq() {
             return {
-                low: Slider(either(0x02, 0x03)),
-                mid: Slider(either(0x04, 0x05)),
-                high: Slider(either(0x06, 0x07)),
+                low: Slider(either(0x02, 0x03), 6),
+                mid: Slider(either(0x04, 0x05), 6),
+                high: Slider(either(0x06, 0x07), 6),
             }
         }
         
@@ -231,7 +234,7 @@ StantonSCS3m.Agent = function(device) {
     }
     
     function watch(channel, control, handler) {
-        // Silly indirection through registry that keeps all watched controls
+        // Silly indirection through a registry that keeps all watched controls
         var ctrl = channel + control;
 
         if (!watched[ctrl]) {
@@ -242,12 +245,12 @@ StantonSCS3m.Agent = function(device) {
         if (loading) {
             // ugly UGLY workaround
             // The device does not light meters again if they haven't changed from last value before resetting flat mode
-            // so we tell it some bullshit values which causes awful flicker, but only during startup
+            // so we tell it some bullshit values which causes awful flicker, luckily only during startup
             // The trigger will then set things straight
-            tell(watched[ctrl](-1));
-            tell(watched[ctrl](0));
-            tell(watched[ctrl](0.5));
             tell(watched[ctrl](1));
+            tell(watched[ctrl](0.5));
+            tell(watched[ctrl](0.25));
+            tell(watched[ctrl](0));
         }
         
         engine.trigger(channel, control);
@@ -343,6 +346,15 @@ StantonSCS3m.Agent = function(device) {
             );
         }
     }
+    
+    // Gain values in Mixx go from 0 to 
+    function setgain(channel, control) {
+        return function(value) {
+            var val = value/64;
+            if (val > 1) val = 1 + (val - 1) * 3;
+            engine.setValue(channel, control, val);
+        }
+    }
 
     // relative control
     function budge(channel, control) {
@@ -366,8 +378,18 @@ StantonSCS3m.Agent = function(device) {
     function Switch() {
         var engaged = false;
         return {
-            'engage': function() { engaged = true; repatch(); },
-            'cancel': function() { engaged = false; repatch(); },
+            'engage': function() {
+                if (!engaged) {
+                    engaged = true;
+                    repatch();
+                }
+            },
+            'cancel': function() {
+                if (engaged) {
+                    engaged = false;
+                    repatch();
+                }
+            },
             'toggle': function() { engaged = !engaged; repatch(); },
             'engaged': function() { return engaged; },
             'choose': function(off, on) { return engaged ? on : off; }
@@ -392,7 +414,6 @@ StantonSCS3m.Agent = function(device) {
             
             // Switch deck/channel when button is touched
             expect(part.deck.touch, deck[side].toggle);
-
             tell(part.deck.light[deck[side].choose('first', 'second')]);
 
             function either(left, right) { return (side == 'left') ? left : right }
@@ -400,6 +421,13 @@ StantonSCS3m.Agent = function(device) {
             var no = deck[side].choose(either(1,2), either(3,4));
             var channel = '[Channel'+no+']';
 
+            expect(part.eq.high.slide, setgain(channel, 'filterHigh'));
+            watch(channel, 'filterHigh', patch(part.eq.high.meter.centergainbar));
+            expect(part.eq.mid.slide, setgain(channel, 'filterMid'));
+            watch(channel, 'filterMid', patch(part.eq.mid.meter.centergainbar));
+            expect(part.eq.low.slide, setgain(channel, 'filterLow'));
+            watch(channel, 'filterLow', patch(part.eq.low.meter.centergainbar));
+            
             if (master.engaged()) {
                 tellslowly(part.gain.mode.relative);
                 tellslowly(part.gain.mode.end);
