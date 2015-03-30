@@ -13,7 +13,7 @@ StantonSCS3m.init = function(id, debugging) {
     this.device = this.Device(0); // Assuming channel is 0 eh?
     this.agent = this.Agent(this.device);
     this.agent.start();
-    this.timer = engine.beginTimer(30, this.agent.tick);
+    this.timer = engine.beginTimer(40, this.agent.tick);
 }
 
 StantonSCS3m.shutdown = function() {
