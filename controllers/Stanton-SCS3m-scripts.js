@@ -13,7 +13,7 @@ StantonSCS3m.init = function(id, debugging) {
     this.device = this.Device(0); // Assuming channel is 0 eh?
     this.agent = this.Agent(this.device);
     this.agent.start();
-    this.timer = engine.beginTimer(20, this.agent.tick);
+    this.timer = engine.beginTimer(30, this.agent.tick);
 }
 
 StantonSCS3m.shutdown = function() {
@@ -61,6 +61,9 @@ StantonSCS3m.Device = function(channel) {
             },
             centerbar: function(value) {
                 return [CC, id, 0x15 + lights(-1, 1, value)]
+            },
+            halfcenterbar: function(value) {
+                return [CC, id, 0x15 + lights(0, 1, value)]
             },
             centergainbar: function(value) {
                 return [CC, id, 0x15 + lights(0, 2, value)]
@@ -247,12 +250,9 @@ StantonSCS3m.Agent = function(device) {
             // ugly UGLY workaround
             // The device does not light meters again if they haven't changed from last value before resetting flat mode
             // so we tell it some bullshit values which causes awful flicker, luckily only during startup
-            // It also seems to help adding more messages?!
             // The trigger will then set things straight
-            tell(watched[ctrl](1));
+            tell(watched[ctrl](-0.5));
             tell(watched[ctrl](0.5));
-            tell(watched[ctrl](0.25));
-            tell(watched[ctrl](0.125));
             tell(watched[ctrl](0));
         }
         
@@ -329,13 +329,21 @@ StantonSCS3m.Agent = function(device) {
         }
 
         if (!sent) {
-            // Open the pipe
-            throttling = false;
-            
             // And flush
             while (message = pipe.shift()) {
-                tell(message);
+                sent = send(message);
+
+                // Device seems overwhelmed by flurry of messages on init, go easy
+                if (loading && sent) return;
             }
+            
+            // Open the pipe
+            throttling = false;
+           if (loading) print('done loading'); 
+            // WTF is this doing here?
+            // This point is reached the first time there were no more messages queued
+            // At this point we know we're done loading
+            loading = false;
         }
     }
     
@@ -474,7 +482,7 @@ StantonSCS3m.Agent = function(device) {
                 set(effectchannel, 'super1'),
                 reset(effectchannel, 'super1', 0.5)
             ));
-            watch(effectchannel, 'super1', patch(part.pitch.meter.needle));
+            watch(effectchannel, 'super1', patch(part.pitch.meter.halfcenterbar));
             
             
             expect(part.eq.high.slide, eqsideheld.choose(
@@ -541,7 +549,6 @@ StantonSCS3m.Agent = function(device) {
             loading = true;
             tellslowly([device.flat]);
             patchage();
-            loading = false;
         },
         tick: tick,
         receive: receive,
