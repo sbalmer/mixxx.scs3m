@@ -540,7 +540,12 @@ StantonSCS3m.Agent = function(device) {
             }
         }
 
-        tell(device.logo.on);
+        // Light the logo and let it go out to signal overload
+        watch("[Master]", 'audio_latency_overload', binarylight(
+            device.logo.on,
+            device.logo.off
+        ));
+        
         Side('left');
         Side('right');
 
