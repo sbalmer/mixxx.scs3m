@@ -547,10 +547,20 @@ StantonSCS3m.Agent = function(device) {
         expect(device.master.touch,   repatch(master.engage));
         expect(device.master.release, repatch(master.cancel));
         if (master.engaged()) {
-            expect(device.left.pitch.slide, setcenter('[Master]', 'headMix'));
             watch("[Master]", "headMix", patch(device.left.pitch.meter.centerbar));
-            expect(device.right.pitch.slide, setcenter('[Master]', 'balance'));
+            expect(device.left.pitch.slide, 
+                eqheld.left.engaged() || fxheld.left.engaged()
+                ? reset('[Master]', 'headMix', -1)
+                : setcenter('[Master]', 'headMix')
+            );
+            
             watch("[Master]", "balance", patch(device.right.pitch.meter.centerbar));
+            expect(device.right.pitch.slide, 
+                eqheld.right.engaged() || fxheld.right.engaged()
+                ? reset('[Master]', 'balance', 0)
+                : setcenter('[Master]', 'balance')
+            );
+            
             watch("[Master]", "VuMeterL", patch(device.left.meter.vubar));
             watch("[Master]", "VuMeterR", patch(device.right.meter.vubar));
         }
