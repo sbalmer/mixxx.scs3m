@@ -454,6 +454,10 @@ StantonSCS3m.Agent = function(device) {
         left: Switch(),
         right: Switch()
     }
+    var button1held = {
+        left: Switch(),
+        right: Switch()
+    }
     
     function repatch(handler) {
         return function(value) {
@@ -516,20 +520,30 @@ StantonSCS3m.Agent = function(device) {
             expect(part.modes.fx.release, repatch(fxsideheld.cancel));
             tell(part.modes.fx.light[fxsideheld.choose(fxon[channelno].choose('blue', 'red'), 'purple')]);
             
-            if (master.engaged()) {
-                tellslowly([
-                    part.gain.mode.relative,
-                    part.gain.mode.end
-                ]);
-                expect(part.gain.slide, budge(channel, 'pregain'));
-                watch(channel, 'pregain', patch(part.gain.meter.gainneedle));
-            } else {
-                tellslowly([
-                    part.gain.mode.absolute,
-                    part.gain.mode.end
-                ]);
-                expect(part.gain.slide, set(channel, 'volume'));
-                watch(channel, 'volume', patch(part.gain.meter.bar));
+            var button1sideheld = button1held[side];
+            expect(part.touches.one.touch, repatch(button1sideheld.engage));
+            expect(part.touches.one.release, repatch(button1sideheld.cancel));
+            tell(part.touches.one.light[button1sideheld.choose('blue', 'purple')]);
+          
+            expect(part.touches.four.touch, toggle(channel, 'play'));
+            watch(channel, 'play', binarylight(part.touches.four.light.blue, part.touches.four.light.red));
+            
+            if (!master.engaged()) {         
+                if (button1sideheld.engaged()) {
+                    tellslowly([
+                        part.gain.mode.relative,
+                        part.gain.mode.end
+                    ]);
+                    expect(part.gain.slide, budge(channel, 'pregain'));
+                    watch(channel, 'pregain', patch(part.gain.meter.gainneedle));
+                } else {
+                    tellslowly([
+                        part.gain.mode.absolute,
+                        part.gain.mode.end
+                    ]);
+                    expect(part.gain.slide, set(channel, 'volume'));
+                    watch(channel, 'volume', patch(part.gain.meter.bar));
+                }
             }
 
             watch(channel, 'pfl', binarylight(part.phones.light.blue, part.phones.light.red));
@@ -540,7 +554,7 @@ StantonSCS3m.Agent = function(device) {
             }
         }
 
-        // Light the logo and let it go out to signal overload
+        // Light the logo and let it go out to signal an overload
         watch("[Master]", 'audio_latency_overload', binarylight(
             device.logo.on,
             device.logo.off
