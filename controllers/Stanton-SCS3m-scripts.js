@@ -224,7 +224,7 @@ StantonSCS3m.Agent = function(device) {
     }
     
     function receive(type, control, value) {
-        var address = type << 8 + control;
+        var address = (type << 8) + control;
 
         if (handler = receivers[address]) {
             handler(value);
@@ -233,7 +233,7 @@ StantonSCS3m.Agent = function(device) {
     }
     
     function expect(control, handler) {
-        var address = control[0] << 8 + control[1];
+        var address = (control[0] << 8) + control[1];
         receivers[address] = handler;
     }
     
