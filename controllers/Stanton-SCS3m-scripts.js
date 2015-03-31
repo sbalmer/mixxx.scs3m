@@ -581,6 +581,20 @@ StantonSCS3m.Agent = function(device) {
                 : setcenter('[Master]', 'balance')
             );
             
+            tellslowly([
+                device.left.gain.mode.relative,
+                device.left.gain.mode.end
+            ]);
+            watch("[Master]", "headVolume", patch(device.left.gain.meter.centergainbar));
+            expect(device.left.gain.slide, budge('[Master]', 'headVolume'));
+            
+            tellslowly([
+                device.right.gain.mode.relative,
+                device.right.gain.mode.end
+            ]);
+            watch("[Master]", "volume", patch(device.right.gain.meter.centergainbar));
+            expect(device.right.gain.slide, budge('[Master]', 'volume'));
+            
             watch("[Master]", "VuMeterL", patch(device.left.meter.vubar));
             watch("[Master]", "VuMeterR", patch(device.right.meter.vubar));
         }
