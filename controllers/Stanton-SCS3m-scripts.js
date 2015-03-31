@@ -254,6 +254,7 @@ StantonSCS3m.Agent = function(device) {
             tell(handler(-0.5));
             tell(handler(0.5));
             tell(handler(0));
+            tell(handler(1));
         }
         
         engine.trigger(channel, control);
