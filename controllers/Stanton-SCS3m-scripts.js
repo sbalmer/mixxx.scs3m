@@ -482,12 +482,13 @@ StantonSCS3m.Agent = function(device) {
                 part.pitch.mode.absolute,
                 part.pitch.mode.end
             ]);
-            expect(part.pitch.slide, eqsideheld.choose(
-                set(effectchannel, 'super1'),
-                reset(effectchannel, 'super1', 0.5)
-            ));
-            watch(effectchannel, 'super1', patch(part.pitch.meter.halfcenterbar));
-            
+            if (!master.engaged()) {
+                expect(part.pitch.slide, eqsideheld.choose(
+                    set(effectchannel, 'super1'),
+                    reset(effectchannel, 'super1', 0.5)
+                ));
+                watch(effectchannel, 'super1', patch(part.pitch.meter.halfcenterbar));
+            }
             
             expect(part.eq.high.slide, eqsideheld.choose(
                 setgain(channel, 'filterHigh'),
@@ -532,8 +533,10 @@ StantonSCS3m.Agent = function(device) {
 
             watch(channel, 'pfl', binarylight(part.phones.light.blue, part.phones.light.red));
             expect(part.phones.touch, toggle(channel, 'pfl'));
-            
-            watch(channel, 'VuMeter', patch(part.meter.vubar));
+
+            if (!master.engaged()) {
+                watch(channel, 'VuMeter', patch(part.meter.vubar));
+            }
         }
 
         tell(device.logo.on);
@@ -543,7 +546,14 @@ StantonSCS3m.Agent = function(device) {
         tell(device.master.light[master.choose('blue', 'purple')]);
         expect(device.master.touch,   repatch(master.engage));
         expect(device.master.release, repatch(master.cancel));
-
+        if (master.engaged()) {
+            expect(device.left.pitch.slide, setcenter('[Master]', 'headMix'));
+            watch("[Master]", "headMix", patch(device.left.pitch.meter.centerbar));
+            expect(device.right.pitch.slide, setcenter('[Master]', 'balance'));
+            watch("[Master]", "balance", patch(device.right.pitch.meter.centerbar));
+            watch("[Master]", "VuMeterL", patch(device.left.meter.vubar));
+            watch("[Master]", "VuMeterR", patch(device.right.meter.vubar));
+        }
         expect(device.crossfader.slide, setcenter("[Master]", "crossfader"));
         watch("[Master]", "crossfader", patch(device.crossfader.meter.centerbar));
     }
