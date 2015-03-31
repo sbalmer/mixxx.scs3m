@@ -251,9 +251,9 @@ StantonSCS3m.Agent = function(device) {
             // The device does not light meters again if they haven't changed from last value before resetting flat mode
             // so we tell it some bullshit values which causes awful flicker, luckily only during startup
             // The trigger will then set things straight
-            tell(watched[ctrl](-0.5));
-            tell(watched[ctrl](0.5));
-            tell(watched[ctrl](0));
+            tell(handler(-0.5));
+            tell(handler(0.5));
+            tell(handler(0));
         }
         
         engine.trigger(channel, control);
@@ -301,50 +301,54 @@ StantonSCS3m.Agent = function(device) {
     
     function tick() {
         var message;
+        var messages;
         var sent = false;
         
         // Send messages that terminate the previous slow command
         // These need to be sent with delay as well
-        while (!sent && (message = slowterm.shift())) {
+        if (message = slowterm.shift()) {
             send(message, true, true);
-            sent = true;
+            return;
         }
         
         // Send messages where the device needs a pause after
-        while (!sent && (messages = slow.shift())) {
+        while (messages = slow.shift()) {
+            // There are usually two messages, one to tell the device
+            // what to do, and one to therminate the command
             message = messages.shift();
             
             // Drop by drop
             if (message.length > 3) {
                 midi.sendSysexMsg(message, message.length);
-                sent = true;
+                
+                // We're done, sysex doesn't have termination command
+                return;
             } else {
                 sent = send(message);
                 
                 // Only send termination commands if the command itself was sent
                 if (sent) {
                     slowterm = messages;
+                    return;
                 }
             }
         }
 
-        if (!sent) {
-            // And flush
-            while (message = pipe.shift()) {
-                sent = send(message);
+        // And flush
+        while (message = pipe.shift()) {
+            sent = send(message);
 
-                // Device seems overwhelmed by flurry of messages on init, go easy
-                if (loading && sent) return;
-            }
-            
-            // Open the pipe
-            throttling = false;
-           if (loading) print('done loading'); 
-            // WTF is this doing here?
-            // This point is reached the first time there were no more messages queued
-            // At this point we know we're done loading
-            loading = false;
+            // Device seems overwhelmed by flurry of messages on init, go easy
+            if (loading && sent) return;
         }
+        
+        // Open the pipe
+        throttling = false;
+
+        // WTF is this doing here?
+        // This point is reached the first time there were no more messages queued
+        // At this point we know we're done loading
+        loading = false;
     }
     
     // Build a handler that sends messages to the device when it receives engine values
