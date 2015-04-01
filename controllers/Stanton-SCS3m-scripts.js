@@ -359,13 +359,13 @@ StantonSCS3m.Agent = function(device) {
     
     // Handle gain values [0..4]
     // Center is 1.0
-    // Engine values over 1.0 are slightly overweighted so they reach 1.0 before engine value reaches 4.0.
+    // Engine values over 1.0 are overweighted so they reach max lights before engine value reaches 4.0.
     function gainpatch(translator) {
         return function(value) {
             if (value <= 1.0) {
                 value = value / 2;
             } else {
-                value = (value + 2) / 5.8
+                value = 0.5 + (value - 1) / 4
             }
             tell(translator(value));
         }
@@ -392,6 +392,13 @@ StantonSCS3m.Agent = function(device) {
         return function(value) {
             value = (value + 1) / 2;
             tell(translator(value));
+        }
+    }
+    
+    // accelerate away from 0.5 so that small changes become visible
+    function offcenter(translator) {
+        return function(value) {
+            return translator(Math.pow(Math.abs(value - 0.5) * 2, 0.7) / (value < 0.5 ? -2 : 2) + 0.5)
         }
     }
     
@@ -426,7 +433,7 @@ StantonSCS3m.Agent = function(device) {
         }
     }
     
-    // Gain values in Mixx go from 0 to 
+    // Gain values in Mixx go from 0 to 4
     function setgain(channel, control) {
         return function(value) {
             var val = value/64;
@@ -526,7 +533,7 @@ StantonSCS3m.Agent = function(device) {
                     set(effectchannel, 'super1'),
                     reset(effectchannel, 'super1', 0.5)
                 ));
-                watch(effectchannel, 'super1', volumepatch(part.pitch.meter.centerbar));
+                watch(effectchannel, 'super1', offcenter(volumepatch(part.pitch.meter.centerbar)));
             }
             
             expect(part.eq.high.slide, eqsideheld.choose(
@@ -541,9 +548,9 @@ StantonSCS3m.Agent = function(device) {
                 setgain(channel, 'filterLow'),
                 reset(channel, 'filterLow', 1)
             ));
-            watch(channel, 'filterHigh', gainpatch(part.eq.high.meter.centerbar));
-            watch(channel, 'filterMid', gainpatch(part.eq.mid.meter.centerbar));
-            watch(channel, 'filterLow', gainpatch(part.eq.low.meter.centerbar));
+            watch(channel, 'filterHigh',gainpatch(offcenter(part.eq.high.meter.centerbar)));
+            watch(channel, 'filterMid', gainpatch(offcenter(part.eq.mid.meter.centerbar)));
+            watch(channel, 'filterLow', gainpatch(offcenter(part.eq.low.meter.centerbar)));
 
             expect(part.modes.eq.touch, repatch(both(eqsideheld.engage, fxon[channelno].cancel)));
             expect(part.modes.eq.release, repatch(eqsideheld.cancel));
