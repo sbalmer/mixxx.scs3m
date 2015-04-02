@@ -596,7 +596,13 @@ StantonSCS3m.Agent = function(device) {
 
             watch(channel, 'pfl', binarylight(part.phones.light.blue, part.phones.light.red));
             expect(part.phones.touch, toggle(channel, 'pfl'));
-
+            
+            // Needledrop into track
+            if (button1sideheld.engaged()) {
+                expect(device.crossfader.slide, set(channel, "playposition"));
+                tell(device.crossfader.meter.bar(0));
+                watch(channel, "playposition", patch(device.crossfader.meter.needle));
+            }
             if (!master.engaged()) {
                 watch(channel, 'VuMeter', vupatch(part.meter.bar));
             }
@@ -646,8 +652,13 @@ StantonSCS3m.Agent = function(device) {
             watch("[Master]", "VuMeterL", vupatch(device.left.meter.bar));
             watch("[Master]", "VuMeterR", vupatch(device.right.meter.bar));
         }
-        expect(device.crossfader.slide, setcenter("[Master]", "crossfader"));
-        watch("[Master]", "crossfader", centerpatch(device.crossfader.meter.centerbar));
+        
+        if (button1held.left.engaged() || button1held.right.engaged()) {
+            // Handled in Side()
+        } else {
+            expect(device.crossfader.slide, setcenter("[Master]", "crossfader"));
+            watch("[Master]", "crossfader", centerpatch(device.crossfader.meter.centerbar));
+        }
     }
     
     return {
