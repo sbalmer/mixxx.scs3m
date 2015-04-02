@@ -583,7 +583,7 @@ StantonSCS3m.Agent = function(device) {
                         part.gain.mode.end
                     ]);
                     expect(part.gain.slide, budge(channel, 'pregain'));
-                    watch(channel, 'pregain', gainpatch(part.gain.meter.needle));
+                    watch(channel, 'pregain', gainpatch(offcenter(part.gain.meter.needle)));
                 } else {
                     tellslowly([
                         part.gain.mode.absolute,
