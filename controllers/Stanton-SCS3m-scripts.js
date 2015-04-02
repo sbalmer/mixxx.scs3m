@@ -395,10 +395,11 @@ StantonSCS3m.Agent = function(device) {
         }
     }
     
-    // accelerate away from 0.5 so that small changes become visible
+    // accelerate away from 0.5 so that small changes become visible faster
     function offcenter(translator) {
         return function(value) {
-            return translator(Math.pow(Math.abs(value - 0.5) * 2, 0.7) / (value < 0.5 ? -2 : 2) + 0.5)
+            // If you want to adjust it, fiddle with the exponent (second argument to pow())
+            return translator(Math.pow(Math.abs(value - 0.5) * 2, 0.6) / (value < 0.5 ? -2 : 2) + 0.5)
         }
     }
     
