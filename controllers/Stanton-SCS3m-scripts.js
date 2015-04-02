@@ -566,7 +566,13 @@ StantonSCS3m.Agent = function(device) {
             expect(part.touches.one.touch, repatch(button1sideheld.engage));
             expect(part.touches.one.release, repatch(button1sideheld.cancel));
             tell(part.touches.one.light[button1sideheld.choose('blue', 'purple')]);
-          
+
+            expect(part.touches.two.touch, reset(channel, 'back', 1));
+            expect(part.touches.two.release, reset(channel, 'back', 0));
+            watch(channel, 'back', binarylight(part.touches.two.light.blue, part.touches.two.light.red));
+            expect(part.touches.three.touch, reset(channel, 'fwd', 1));
+            expect(part.touches.three.release, reset(channel, 'fwd', 0));
+            watch(channel, 'fwd', binarylight(part.touches.three.light.blue, part.touches.three.light.red));
             expect(part.touches.four.touch, toggle(channel, 'play'));
             watch(channel, 'play', binarylight(part.touches.four.light.blue, part.touches.four.light.red));
             
