@@ -213,7 +213,7 @@ StantonSCS3m.Agent = function(device) {
     
     function clear() {
         receivers = {};
-        drops = [];
+        slow = [];
         pipe = [];
 
         // I'd like to disconnect everything on clear, but that doesn't work when using closure callbacks, I guess I'd have to pass the callback function as string name
