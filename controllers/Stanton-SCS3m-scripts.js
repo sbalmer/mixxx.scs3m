@@ -1,8 +1,6 @@
 "use strict";
 
 // issues:
-// - volume faders don't reach max
-//    probably need some stretching, or maybe there's a final NoteOn when they reach top
 // - fx mode not mapped, what to put there?
 
 // for g in $(seq 0 255); do l=$(printf '%02x\n' $g); for n in $(seq 0 255); do h=$(printf "%02x" $n); echo $h$l; amidi -p hw:1 -S B0${h}${l}; done; done;
@@ -384,14 +382,6 @@ StantonSCS3m.Agent = function(device) {
         }
     }
     
-    // Overrate value a bit so it reaches 1.0
-    function volumepatch(translator) {
-        return function(value) {
-            value = value * 1.05;
-            tell(translator(value));
-        }
-    }
-    
     // For engine values [-1..1]
     function centerpatch(translator) {
         return function(value) {
@@ -425,7 +415,7 @@ StantonSCS3m.Agent = function(device) {
     function set(channel, control) {
         return function(value) {
             engine.setValue(channel, control,
-                value/128
+                value/127
             );
         }
     }
@@ -539,7 +529,7 @@ StantonSCS3m.Agent = function(device) {
                     set(effectchannel, 'super1'),
                     reset(effectchannel, 'super1', 0.5)
                 ));
-                watch(effectchannel, 'super1', offcenter(volumepatch(part.pitch.meter.centerbar)));
+                watch(effectchannel, 'super1', offcenter(patch(part.pitch.meter.centerbar)));
             }
             
             expect(part.eq.high.slide, eqsideheld.choose(
@@ -595,7 +585,7 @@ StantonSCS3m.Agent = function(device) {
                         part.gain.mode.end
                     ]);
                     expect(part.gain.slide, set(channel, 'volume'));
-                    watch(channel, 'volume', volumepatch(part.gain.meter.bar));
+                    watch(channel, 'volume', patch(part.gain.meter.bar));
                 }
             }
 
