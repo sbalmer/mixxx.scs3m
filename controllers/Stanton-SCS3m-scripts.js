@@ -1,5 +1,11 @@
 "use strict";
 
+// issues:
+// - volume faders don't reach max
+//    probably need some stretching, or maybe there's a final NoteOn when they reach top
+// - fx mode not mapped, what to put there?
+// - master held phones wet/dry not lighted correctly
+
 // for g in $(seq 0 255); do l=$(printf '%02x\n' $g); for n in $(seq 0 255); do h=$(printf "%02x" $n); echo $h$l; amidi -p hw:1 -S B0${h}${l}; done; done;
 // amidi -p hw:1 -S F00001601501F7
 
