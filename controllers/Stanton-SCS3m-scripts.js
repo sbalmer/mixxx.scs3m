@@ -577,11 +577,15 @@ StantonSCS3m.Agent = function(device) {
             var tnr = 0;
             for (; tnr < 4; tnr++) {
                 var touch = part.touches[tnr];
+                var fxchannel = channel;
+                if (master.engaged()) {
+                    fxchannel = either('[Headphone]', '[Master]');
+                }
                 var effectunit = '[EffectRack1_EffectUnit'+(tnr+1)+']';
-                var effectunit_enable = 'group_'+channel+'_enable';
+                var effectunit_enable = 'group_'+fxchannel+'_enable';
                 var effectunit_effect = '[EffectRack1_EffectUnit'+(tnr+1)+'_Effect1]';
                 
-                if (fxsideheld.engaged()) {
+                if (fxsideheld.engaged() || master.engaged()) {
                     expect(touch.touch, toggle(effectunit, effectunit_enable));
                 } else {
                     expect(touch.touch, repatch(sideoverlay.engage(tnr)));
