@@ -568,7 +568,7 @@ StantonSCS3m.Agent = function(device) {
                 setgain(channel, 'filterLow'),
                 reset(channel, 'filterLow', 1)
             ));
-            watch(channel, 'filterHigh',gainpatch(offcenter(part.eq.high.meter.centerbar)));
+            watch(channel, 'filterHigh', gainpatch(offcenter(part.eq.high.meter.centerbar)));
             watch(channel, 'filterMid', gainpatch(offcenter(part.eq.mid.meter.centerbar)));
             watch(channel, 'filterLow', gainpatch(offcenter(part.eq.low.meter.centerbar)));
 
