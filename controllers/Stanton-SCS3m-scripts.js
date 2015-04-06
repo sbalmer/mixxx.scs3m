@@ -593,8 +593,12 @@ StantonSCS3m.Agent = function(device) {
                     expect(touch.touch, repatch(sideoverlay.engage(tnr)));
                 }
                 expect(touch.release, repatch(sideoverlay.cancel(tnr)));
-                watch(effectunit, effectunit_enable, binarylight(touch.light.blue, touch.light.red));
-
+                if (sideoverlay.engaged(tnr)) {
+                    tell(touch.light.purple);
+                } else {
+                    watch(effectunit, effectunit_enable, binarylight(touch.light.blue, touch.light.red));
+                }
+                
                 if (sideoverlay.engaged(tnr)) {
                     expect(part.pitch.slide, eqsideheld.choose(
                         set(effectunit, 'mix'),
