@@ -150,12 +150,12 @@ StantonSCS3m.Device = function(channel) {
         }
         
         function Touches() {
-            return {
-                one: Touch(either(0x00, 0x01)),
-                two: Touch(either(0x02, 0x03)),
-                three: Touch(either(0x04, 0x05)),
-                four: Touch(either(0x06, 0x07)),
-            }
+            return [
+                Touch(either(0x00, 0x01)),
+                Touch(either(0x02, 0x03)),
+                Touch(either(0x04, 0x05)),
+                Touch(either(0x06, 0x07)),
+            ];
         }
         
         function Phones() {
@@ -420,6 +420,14 @@ StantonSCS3m.Agent = function(device) {
             );
         }
     }
+    
+    function setparam(channel, control) {
+        return function(value) {
+            engine.setParameter(channel, control,
+                value/127
+            );
+        }
+    }
 
     // absolute centered control
     function setcenter(channel, control) {
@@ -439,9 +447,9 @@ StantonSCS3m.Agent = function(device) {
         }
     }
     
-    function reset(channel, control, value) {
+    function reset(channel, control) {
         return function() {
-            engine.setValue(channel, control, value);
+            engine.reset(channel, control);
         }
     }
 
@@ -475,24 +483,32 @@ StantonSCS3m.Agent = function(device) {
         }
     }
     
+    function Multiswitch(preset) {
+        var engaged = preset;
+        return {
+            'engage': function(pos) { return function() { engaged = pos; }  },
+            'cancel': function(pos) { return function() { if (engaged === pos) engaged = preset; } },
+            'engaged': function(pos) { return engaged === pos },
+            'choose': function(pos, off, on) { return (engaged === pos) ? on : off; }
+        }
+    }
+    
     var master = Switch(); // Whether master key is held
     var deck = {
         left: Switch(), // off: channel1, on: channel3
         right: Switch() // off: channel2, on: channel4
     }
-    var fxon = {
-        1: Switch(), 2: Switch(), 3: Switch(), 4: Switch()
-    } // off: eq active, on: fx active
+
+    var overlay = {
+        left:  Multiswitch('eq'),
+        right: Multiswitch('eq')
+    }
     
     var eqheld = {
         left: Switch(),
         right: Switch()
     }
     var fxheld = {
-        left: Switch(),
-        right: Switch()
-    }
-    var button1held = {
         left: Switch(),
         right: Switch()
     }
@@ -507,6 +523,7 @@ StantonSCS3m.Agent = function(device) {
     }
     
     function patchage() {
+        
         function Side(side) {
             var part = device[side];
             
@@ -520,6 +537,7 @@ StantonSCS3m.Agent = function(device) {
             var channel = '[Channel'+channelno+']';
             var effectchannel = '[QuickEffectRack1_[Channel'+channelno+']]';
             var eqsideheld = eqheld[side];
+            var sideoverlay = overlay[side];
 
             if (!master.engaged()) {            
                 tellslowly([
@@ -533,47 +551,69 @@ StantonSCS3m.Agent = function(device) {
                 watch(effectchannel, 'super1', offcenter(patch(part.pitch.meter.centerbar)));
             }
             
-            expect(part.eq.high.slide, eqsideheld.choose(
-                setgain(channel, 'filterHigh'),
-                reset(channel, 'filterHigh', 1)
-            ));
-            expect(part.eq.mid.slide, eqsideheld.choose(
-                setgain(channel, 'filterMid'),
-                reset(channel, 'filterMid', 1)
-            ));
-            expect(part.eq.low.slide, eqsideheld.choose(
-                setgain(channel, 'filterLow'),
-                reset(channel, 'filterLow', 1)
-            ));
-            watch(channel, 'filterHigh',gainpatch(offcenter(part.eq.high.meter.centerbar)));
-            watch(channel, 'filterMid', gainpatch(offcenter(part.eq.mid.meter.centerbar)));
-            watch(channel, 'filterLow', gainpatch(offcenter(part.eq.low.meter.centerbar)));
+            if (sideoverlay.engaged('eq')) {
+                expect(part.eq.high.slide, eqsideheld.choose(
+                    setgain(channel, 'filterHigh'),
+                    reset(channel, 'filterHigh')
+                ));
+                expect(part.eq.mid.slide, eqsideheld.choose(
+                    setgain(channel, 'filterMid'),
+                    reset(channel, 'filterMid')
+                ));
+                expect(part.eq.low.slide, eqsideheld.choose(
+                    setgain(channel, 'filterLow'),
+                    reset(channel, 'filterLow')
+                ));
+                watch(channel, 'filterHigh', gainpatch(offcenter(part.eq.high.meter.centerbar)));
+                watch(channel, 'filterMid', gainpatch(offcenter(part.eq.mid.meter.centerbar)));
+                watch(channel, 'filterLow', gainpatch(offcenter(part.eq.low.meter.centerbar)));
+            }
 
-            expect(part.modes.eq.touch, repatch(both(eqsideheld.engage, fxon[channelno].cancel)));
+            expect(part.modes.eq.touch, repatch(eqsideheld.engage));
             expect(part.modes.eq.release, repatch(eqsideheld.cancel));
-            tell(part.modes.eq.light[eqsideheld.choose(fxon[channelno].choose('red', 'blue'), 'purple')]);
-            
+            tell(part.modes.eq.light[eqsideheld.choose(sideoverlay.choose('eq', 'blue', 'red'), 'purple')]);
+           
             var fxsideheld = fxheld[side];
-            expect(part.modes.fx.touch, repatch(both(fxsideheld.engage, fxon[channelno].engage)));
-            expect(part.modes.fx.release, repatch(fxsideheld.cancel));
-            tell(part.modes.fx.light[fxsideheld.choose(fxon[channelno].choose('blue', 'red'), 'purple')]);
-            
-            var button1sideheld = button1held[side];
-            expect(part.touches.one.touch, repatch(button1sideheld.engage));
-            expect(part.touches.one.release, repatch(button1sideheld.cancel));
-            tell(part.touches.one.light[button1sideheld.choose('blue', 'purple')]);
+            var tnr = 0;
+            for (; tnr < 4; tnr++) {
+                var touch = part.touches[tnr];
+                var effectunit = '[EffectRack1_EffectUnit'+(tnr+1)+']';
+                var effectunit_enable = 'group_'+channel+'_enable';
+                var effectunit_effect = '[EffectRack1_EffectUnit'+(tnr+1)+'_Effect1]';
+                
+                if (fxsideheld.engaged()) {
+                    expect(touch.touch, toggle(effectunit, effectunit_enable));
+                } else {
+                    expect(touch.touch, repatch(sideoverlay.engage(tnr)));
+                }
+                expect(touch.release, repatch(sideoverlay.cancel(tnr)));
+                watch(effectunit, effectunit_enable, binarylight(touch.light.blue, touch.light.red));
 
-            expect(part.touches.two.touch, reset(channel, 'back', 1));
-            expect(part.touches.two.release, reset(channel, 'back', 0));
-            watch(channel, 'back', binarylight(part.touches.two.light.blue, part.touches.two.light.red));
-            expect(part.touches.three.touch, reset(channel, 'fwd', 1));
-            expect(part.touches.three.release, reset(channel, 'fwd', 0));
-            watch(channel, 'fwd', binarylight(part.touches.three.light.blue, part.touches.three.light.red));
-            expect(part.touches.four.touch, toggle(channel, 'play'));
-            watch(channel, 'play', binarylight(part.touches.four.light.blue, part.touches.four.light.red));
+                if (sideoverlay.engaged(tnr)) {
+                    expect(part.eq.high.slide, eqsideheld.choose(
+                        setparam(effectunit_effect, 'parameter3'),
+                        reset(effectunit_effect, 'parameter3')
+                    ));
+                    expect(part.eq.mid.slide, eqsideheld.choose(
+                        setparam(effectunit_effect, 'parameter2'),
+                        reset(effectunit_effect, 'parameter2')
+                    ));
+                    expect(part.eq.low.slide, eqsideheld.choose(
+                        setparam(effectunit_effect, 'parameter1'),
+                        reset(effectunit_effect, 'parameter1')
+                    ));
+                    watch(effectunit_effect, 'parameter3', patch(part.eq.high.meter.needle));
+                    watch(effectunit_effect, 'parameter2', patch(part.eq.mid.meter.needle));
+                    watch(effectunit_effect, 'parameter1', patch(part.eq.low.meter.needle));
+                }
+            }
             
+            expect(part.modes.fx.touch, repatch(fxsideheld.engage));
+            expect(part.modes.fx.release, repatch(fxsideheld.cancel));
+            tell(part.modes.fx.light[fxsideheld.choose('blue', 'purple')]);
+          
             if (!master.engaged()) {         
-                if (button1sideheld.engaged()) {
+                if (fxsideheld.engaged()) {
                     tellslowly([
                         part.gain.mode.relative,
                         part.gain.mode.end
@@ -594,7 +634,7 @@ StantonSCS3m.Agent = function(device) {
             expect(part.phones.touch, toggle(channel, 'pfl'));
             
             // Needledrop into track
-            if (button1sideheld.engaged()) {
+            if (fxsideheld.engaged()) {
                 expect(device.crossfader.slide, set(channel, "playposition"));
                 tell(device.crossfader.meter.bar(0));
                 watch(channel, "playposition", patch(device.crossfader.meter.needle));
@@ -649,7 +689,7 @@ StantonSCS3m.Agent = function(device) {
             watch("[Master]", "VuMeterR", vupatch(device.right.meter.bar));
         }
         
-        if (button1held.left.engaged() || button1held.right.engaged()) {
+        if (fxheld.left.engaged() || fxheld.right.engaged()) {
             // Handled in Side()
         } else {
             expect(device.crossfader.slide, setcenter("[Master]", "crossfader"));
