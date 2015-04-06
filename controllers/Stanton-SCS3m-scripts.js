@@ -1,8 +1,8 @@
 "use strict";
 
 // issues:
-// - fx mode not mapped, what to put there?
 // - filterHigh/Mid/Low is deprecated, what is the replacement? 
+// - fx controls use setParameter() to set the control, but the returned values are controller values with different min/max so they don't light correctly on the device
 
 // for g in $(seq 0 255); do l=$(printf '%02x\n' $g); for n in $(seq 0 255); do h=$(printf "%02x" $n); echo $h$l; amidi -p hw:1 -S B0${h}${l}; done; done;
 // amidi -p hw:1 -S F00001601501F7
@@ -544,11 +544,13 @@ StantonSCS3m.Agent = function(device) {
                     part.pitch.mode.absolute,
                     part.pitch.mode.end
                 ]);
-                expect(part.pitch.slide, eqsideheld.choose(
-                    set(effectchannel, 'super1'),
-                    reset(effectchannel, 'super1', 0.5)
-                ));
-                watch(effectchannel, 'super1', offcenter(patch(part.pitch.meter.centerbar)));
+                if (sideoverlay.engaged('eq')) {
+                    expect(part.pitch.slide, eqsideheld.choose(
+                        set(effectchannel, 'super1'),
+                        reset(effectchannel, 'super1')
+                    ));
+                    watch(effectchannel, 'super1', offcenter(patch(part.pitch.meter.centerbar)));
+                }
             }
             
             if (sideoverlay.engaged('eq')) {
@@ -594,6 +596,12 @@ StantonSCS3m.Agent = function(device) {
                 watch(effectunit, effectunit_enable, binarylight(touch.light.blue, touch.light.red));
 
                 if (sideoverlay.engaged(tnr)) {
+                    expect(part.pitch.slide, eqsideheld.choose(
+                        set(effectunit, 'mix'),
+                        reset(effectunit, 'mix')
+                    ));
+                    watch(effectunit, 'mix', patch(part.pitch.meter.bar));
+
                     expect(part.eq.high.slide, eqsideheld.choose(
                         setparam(effectunit_effect, 'parameter3'),
                         reset(effectunit_effect, 'parameter3')
