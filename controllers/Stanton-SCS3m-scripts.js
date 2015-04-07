@@ -114,11 +114,8 @@ StantonSCS3m.Device = function() {
         function Deck() {
             var id = either(0x10, 0x0F);
             return {
-                light: {
-                    off: [NoteOn, id, 0],
-                    first: [NoteOn, id, 1],
-                    second: [NoteOn, id, 2],
-                    both: [NoteOn, id, 3]
+                light: function (bits) {
+                    return [NoteOn, id, (bits[0] ? 1 : 0) | (bits[1] ? 2 : 0)]
                 },
                 touch: [NoteOn, id],
                 release: [NoteOff, id]
@@ -265,19 +262,19 @@ StantonSCS3m.Agent = function(device) {
         engine.trigger(channel, control);
     }
     
-    function watchmulti(channel, controls, fold, handler) {
+    function watchmulti(controls, handler) {
         var values = [];
         var wait = controls.length
         var i = 0;
         for (; i < controls.length; i++) {
             (function() {
                 var controlpos = i;
-                watch(channel, controls[controlpos], function(value) {
+                watch(controls[controlpos][0], controls[controlpos][1], function(value) {
                     values[controlpos] = value;
-                    if (wait > 0) {
+                    if (wait > 1) {
                         wait -= 1;
                     } else {
-                        handler(fold(values));
+                        handler(values);
                     }
                 });
             })();
@@ -531,10 +528,6 @@ StantonSCS3m.Agent = function(device) {
     function patchage() {
         function Side(side) {
             var part = device[side];
-            
-            // Switch deck/channel when button is touched
-            expect(part.deck.touch, repatch(deck[side].toggle));
-            tell(part.deck.light[deck[side].choose('first', 'second')]);
 
             function either(left, right) { return (side == 'left') ? left : right }
 
@@ -544,6 +537,23 @@ StantonSCS3m.Agent = function(device) {
             var effectunit = '[EffectRack1_EffectUnit'+channelno+']';
             var effectunit_enable = 'group_'+channel+'_enable';
             var eqsideheld = eqheld[side];
+         
+            // Switch deck/channel when button is touched
+            expect(part.deck.touch, repatch(deck[side].toggle));
+            
+            // Light the corresponding deck (channel 1: A, channel 2: B, channel 3: C, channel 4: D)
+            // Make the lights blink on each beat
+            function beatlight(translator, activepos) {
+                return function(bits) {
+                    bits = bits.slice(); // clone
+                    bits[activepos] = !bits[activepos]; // Invert the bit for the light that should be on
+                    return translator(bits);
+                }
+            }
+            watchmulti([
+                ['[Channel'+either(1,2)+']', 'beat_active'],
+                ['[Channel'+either(3,4)+']', 'beat_active'],
+            ], patch(beatlight(part.deck.light, deck[side].choose(0,1))));
 
             if (!master.engaged()) {            
                 tellslowly([
