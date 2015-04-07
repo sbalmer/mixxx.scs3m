@@ -4,8 +4,9 @@
 // - fx mode not mapped, what to put there?
 // - filterHigh/Mid/Low is deprecated, what is the replacement? 
 
-// for g in $(seq 0 255); do l=$(printf '%02x\n' $g); for n in $(seq 0 255); do h=$(printf "%02x" $n); echo $h$l; amidi -p hw:1 -S B0${h}${l}; done; done;
-// amidi -p hw:1 -S F00001601501F7
+// manually test messages
+// amidi -p hw:1 -S F00001601501F7 # flat mode
+// amidi -p hw:1 -S 900302 # 90: note on, 03: id of a touch button, 02: red LED
 
 StantonSCS3m = {
     timer: false
@@ -37,7 +38,7 @@ StantonSCS3m.Device = function() {
     var black = 0x00;
     var blue = 0x01;
     var red = 0x02;
-    var purple = 0x03;
+    var purple = blue | red;
     
     function Logo() {
         var id = 0x69;
