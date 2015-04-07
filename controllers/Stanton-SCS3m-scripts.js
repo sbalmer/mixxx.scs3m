@@ -16,7 +16,7 @@ StantonSCS3m.init = function(id) {
     this.device = this.Device();
     this.agent = this.Agent(this.device);
     this.agent.start();
-    this.timer = engine.beginTimer(40, this.agent.tick);
+    this.timer = engine.beginTimer(20, this.agent.tick);
 }
 
 StantonSCS3m.shutdown = function() {
@@ -249,10 +249,10 @@ StantonSCS3m.Agent = function(device) {
         if (loading) {
             // ugly UGLY workaround
             // The device does not light meters again if they haven't changed from last value before resetting flat mode
-            // so we tell it some bullshit values which causes awful flicker, luckily only during startup
+            // so we send each control some bullshit values which causes awful flicker during startup
             // The trigger will then set things straight
-            tell(handler(0));
-            tell(handler(1));
+            tell(handler(100));
+            tell(handler(-100));
         }
         
         engine.trigger(channel, control);
