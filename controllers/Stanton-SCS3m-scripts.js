@@ -194,7 +194,7 @@ StantonSCS3m.Agent = function(device) {
     // This is necessary because some messages must be sent with delay lest
     // the device becomes confused
     var loading = true;
-    var throttling = false;
+    var throttling = true;
     var slow = [];
     var slowterm = [];
     var pipe = [];
@@ -251,8 +251,6 @@ StantonSCS3m.Agent = function(device) {
             // The device does not light meters again if they haven't changed from last value before resetting flat mode
             // so we tell it some bullshit values which causes awful flicker, luckily only during startup
             // The trigger will then set things straight
-            tell(handler(-0.5));
-            tell(handler(0.5));
             tell(handler(0));
             tell(handler(1));
         }
@@ -334,21 +332,18 @@ StantonSCS3m.Agent = function(device) {
                 }
             }
         }
-
         // And flush
-        while (message = pipe.shift()) {
-            sent = send(message);
+        
+        while (pipe.length) {
+            message = pipe.shift();
+            sent = message && send(message); // Bug: There are undefined values in the queue, ignoring them
 
             // Device seems overwhelmed by flurry of messages on init, go easy
             if (loading && sent) return;
         }
-        
+
         // Open the pipe
         throttling = false;
-
-        // WTF is this doing here?
-        // This point is reached the first time there were no more messages queued
-        // At this point we know we're done loading
         loading = false;
     }
     
