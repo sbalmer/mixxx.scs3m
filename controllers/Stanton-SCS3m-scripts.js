@@ -205,9 +205,6 @@ StantonSCS3m.Agent = function(device) {
     // Connected engine controls
     var watched = {};
     
-    // No operation 
-    function nop() {};
-    
     function clear() {
         receivers = {};
         slow = [];
@@ -218,7 +215,7 @@ StantonSCS3m.Agent = function(device) {
         // Instead I'm not gonna bother and just let the callbacks do nothing
         for (ctrl in watched) {
             if (watched.hasOwnProperty(ctrl)) {
-                watched[ctrl] = nop;
+                watched[ctrl] = [];
             }
         }
     }
@@ -242,10 +239,18 @@ StantonSCS3m.Agent = function(device) {
         var ctrl = channel + control;
 
         if (!watched[ctrl]) {
-            engine.connectControl(channel, control, function(value) { watched[ctrl](value); });
+            watched[ctrl] = [];
+            engine.connectControl(channel, control, function(value) { 
+                var handlers = watched[ctrl];
+                var i = 0;
+                for(; i < handlers.length; i++) {
+                    handlers[i](value);
+                }
+            });
         }
-        watched[ctrl] = handler;
         
+        watched[ctrl].push(handler);
+
         if (loading) {
             // ugly UGLY workaround
             // The device does not light meters again if they haven't changed from last value before resetting flat mode
@@ -258,7 +263,25 @@ StantonSCS3m.Agent = function(device) {
         }
         
         engine.trigger(channel, control);
-
+    }
+    
+    function watchmulti(channel, controls, fold, handler) {
+        var values = [];
+        var wait = controls.length
+        var i = 0;
+        for (; i < controls.length; i++) {
+            (function() {
+                var controlpos = i;
+                watch(channel, controls[controlpos], function(value) {
+                    values[controlpos] = value;
+                    if (wait > 0) {
+                        wait -= 1;
+                    } else {
+                        handler(fold(values));
+                    }
+                });
+            })();
+        }
     }
     
     
@@ -518,6 +541,8 @@ StantonSCS3m.Agent = function(device) {
             var channelno = deck[side].choose(either(1,2), either(3,4));
             var channel = '[Channel'+channelno+']';
             var effectchannel = '[QuickEffectRack1_[Channel'+channelno+']]';
+            var effectunit = '[EffectRack1_EffectUnit'+channelno+']';
+            var effectunit_enable = 'group_'+channel+'_enable';
             var eqsideheld = eqheld[side];
 
             if (!master.engaged()) {            
@@ -544,7 +569,7 @@ StantonSCS3m.Agent = function(device) {
                 setgain(channel, 'filterLow'),
                 reset(channel, 'filterLow', 1)
             ));
-            watch(channel, 'filterHigh',gainpatch(offcenter(part.eq.high.meter.centerbar)));
+            watch(channel, 'filterHigh', gainpatch(offcenter(part.eq.high.meter.centerbar)));
             watch(channel, 'filterMid', gainpatch(offcenter(part.eq.mid.meter.centerbar)));
             watch(channel, 'filterLow', gainpatch(offcenter(part.eq.low.meter.centerbar)));
 
@@ -552,12 +577,20 @@ StantonSCS3m.Agent = function(device) {
             expect(part.modes.eq.release, repatch(eqsideheld.cancel));
             tell(part.modes.eq.light[eqsideheld.choose(fxon[channelno].choose('red', 'blue'), 'purple')]);
             
-            var fxsideheld = fxheld[side];
-            expect(part.modes.fx.touch, repatch(both(fxsideheld.engage, fxon[channelno].engage)));
-            expect(part.modes.fx.release, repatch(fxsideheld.cancel));
-            tell(part.modes.fx.light[fxsideheld.choose(fxon[channelno].choose('blue', 'red'), 'purple')]);
-            
             var button1sideheld = button1held[side];
+            var fxsideheld = fxheld[side];
+            if (button1sideheld.engaged()) {
+                expect(part.modes.fx.touch, toggle(effectunit, effectunit_enable));
+            } else {
+                expect(part.modes.fx.touch, repatch(both(fxsideheld.engage, fxon[channelno].engage)));
+                expect(part.modes.fx.release, repatch(fxsideheld.cancel));
+            }
+            // Permanently light the FX mode button purple if effect is on
+            watch(effectunit, effectunit_enable, binarylight(
+                part.modes.fx.light[fxsideheld.choose(fxon[channelno].choose('blue', 'red'), 'purple')],
+                part.modes.fx.light.purple
+            ));
+            
             expect(part.touches.one.touch, repatch(button1sideheld.engage));
             expect(part.touches.one.release, repatch(button1sideheld.cancel));
             tell(part.touches.one.light[button1sideheld.choose('blue', 'purple')]);
