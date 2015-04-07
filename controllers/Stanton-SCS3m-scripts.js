@@ -8,13 +8,11 @@
 // amidi -p hw:1 -S F00001601501F7
 
 StantonSCS3m = {
-    timer: false,
-    debugging: false
+    timer: false
 }
 
-StantonSCS3m.init = function(id, debugging) {
-    this.debugging = debugging;
-    this.device = this.Device(0); // Assuming channel is 0 eh?
+StantonSCS3m.init = function(id) {
+    this.device = this.Device();
     this.agent = this.Agent(this.device);
     this.agent.start();
     this.timer = engine.beginTimer(40, this.agent.tick);
@@ -26,14 +24,14 @@ StantonSCS3m.shutdown = function() {
 }
 
 StantonSCS3m.receive = function(channel, control, value, status) {
-    StantonSCS3m.agent.receive(channel|status, control, value)
+    StantonSCS3m.agent.receive(status, control, value)
 }
 
 /* midi map */
-StantonSCS3m.Device = function(channel) {
-    var NoteOn = 0x90 + channel;
-    var NoteOff = 0x80 + channel;
-    var CC = 0xB0 + channel;
+StantonSCS3m.Device = function() {
+    var NoteOn = 0x90;
+    var NoteOff = 0x80;
+    var CC = 0xB0;
     var CM = 0xBF; /* this is used for slider mode changes (absolute/relative, sending a control change on channel 16!?) */
     
     var black = 0x00;
