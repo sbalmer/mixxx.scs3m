@@ -398,13 +398,6 @@ StantonSCS3m.Agent = function(device) {
             tell(value ? on : off);
         }
     }
-    
-    function both(h1, h2) {
-       return function() {
-           h1();
-           h2();
-       }
-    }
 
     // absolute control
     function set(channel, control) {
@@ -474,19 +467,12 @@ StantonSCS3m.Agent = function(device) {
         left: Switch(), // off: channel1, on: channel3
         right: Switch() // off: channel2, on: channel4
     }
-    var fxon = {
-        1: Switch(), 2: Switch(), 3: Switch(), 4: Switch()
-    } // off: eq active, on: fx active
-    
+
     var eqheld = {
         left: Switch(),
         right: Switch()
     }
     var fxheld = {
-        left: Switch(),
-        right: Switch()
-    }
-    var button1held = {
         left: Switch(),
         right: Switch()
     }
@@ -543,31 +529,29 @@ StantonSCS3m.Agent = function(device) {
             watch(channel, 'filterMid', gainpatch(offcenter(part.eq.mid.meter.centerbar)));
             watch(channel, 'filterLow', gainpatch(offcenter(part.eq.low.meter.centerbar)));
 
-            expect(part.modes.eq.touch, repatch(both(eqsideheld.engage, fxon[channelno].cancel)));
+            expect(part.modes.eq.touch, repatch(eqsideheld.engage));
             expect(part.modes.eq.release, repatch(eqsideheld.cancel));
-            tell(part.modes.eq.light[eqsideheld.choose(fxon[channelno].choose('red', 'blue'), 'purple')]);
+            tell(part.modes.eq.light[eqsideheld.choose('red', 'purple')]);
             
             var fxsideheld = fxheld[side];
-            expect(part.modes.fx.touch, repatch(both(fxsideheld.engage, fxon[channelno].engage)));
+            expect(part.modes.fx.touch, repatch(fxsideheld.engage));
             expect(part.modes.fx.release, repatch(fxsideheld.cancel));
-            tell(part.modes.fx.light[fxsideheld.choose(fxon[channelno].choose('blue', 'red'), 'purple')]);
-            
-            var button1sideheld = button1held[side];
-            expect(part.touches.one.touch, repatch(button1sideheld.engage));
-            expect(part.touches.one.release, repatch(button1sideheld.cancel));
-            tell(part.touches.one.light[button1sideheld.choose('blue', 'purple')]);
+            tell(part.modes.fx.light[fxsideheld.choose('blue', 'purple')]);
 
-            expect(part.touches.two.touch, reset(channel, 'back', 1));
-            expect(part.touches.two.release, reset(channel, 'back', 0));
-            watch(channel, 'back', binarylight(part.touches.two.light.blue, part.touches.two.light.red));
-            expect(part.touches.three.touch, reset(channel, 'fwd', 1));
-            expect(part.touches.three.release, reset(channel, 'fwd', 0));
-            watch(channel, 'fwd', binarylight(part.touches.three.light.blue, part.touches.three.light.red));
+            expect(part.touches.one.touch, reset(channel, 'back', 1));
+            expect(part.touches.one.release, reset(channel, 'back', 0));
+            watch(channel, 'back', binarylight(part.touches.one.light.blue, part.touches.one.light.red));
+            expect(part.touches.two.touch, reset(channel, 'fwd', 1));
+            expect(part.touches.two.release, reset(channel, 'fwd', 0));
+            watch(channel, 'fwd', binarylight(part.touches.two.light.blue, part.touches.two.light.red));
+            expect(part.touches.three.touch, reset(channel, 'cue_default', 1));
+            expect(part.touches.three.release, reset(channel, 'cue_default', 0));
+            watch(channel, 'cue_default', binarylight(part.touches.three.light.blue, part.touches.three.light.red));
             expect(part.touches.four.touch, toggle(channel, 'play'));
             watch(channel, 'play', binarylight(part.touches.four.light.blue, part.touches.four.light.red));
             
             if (!master.engaged()) {         
-                if (button1sideheld.engaged()) {
+                if (fxsideheld.engaged()) {
                     tellslowly([
                         part.gain.mode.relative,
                         part.gain.mode.end
@@ -588,7 +572,7 @@ StantonSCS3m.Agent = function(device) {
             expect(part.phones.touch, toggle(channel, 'pfl'));
             
             // Needledrop into track
-            if (button1sideheld.engaged()) {
+            if (fxsideheld.engaged()) {
                 expect(device.crossfader.slide, set(channel, "playposition"));
                 tell(device.crossfader.meter.bar(0));
                 watch(channel, "playposition", patch(device.crossfader.meter.needle));
@@ -643,7 +627,7 @@ StantonSCS3m.Agent = function(device) {
             watch("[Master]", "VuMeterR", vupatch(device.right.meter.bar));
         }
         
-        if (button1held.left.engaged() || button1held.right.engaged()) {
+        if (fxheld.left.engaged() || fxheld.right.engaged()) {
             // Handled in Side()
         } else {
             expect(device.crossfader.slide, setcenter("[Master]", "crossfader"));
