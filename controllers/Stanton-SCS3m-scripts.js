@@ -313,7 +313,7 @@ StantonSCS3m.Agent = function(device) {
         // Send messages where the device needs a pause after
         while (messages = slow.shift()) {
             // There are usually two messages, one to tell the device
-            // what to do, and one to therminate the command
+            // what to do, and one to terminate the command
             message = messages.shift();
             
             // Drop by drop
