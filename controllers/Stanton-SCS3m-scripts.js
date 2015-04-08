@@ -402,27 +402,9 @@ StantonSCS3m.Agent = function(device) {
     // absolute control
     function set(channel, control) {
         return function(value) {
-            engine.setValue(channel, control,
+            engine.setParameter(channel, control,
                 value/127
             );
-        }
-    }
-
-    // absolute centered control
-    function setcenter(channel, control) {
-        return function(value) {
-            engine.setValue(channel, control,
-                (value-64)/63
-            );
-        }
-    }
-    
-    // Gain values in Mixx go from 0 to 4
-    function setgain(channel, control) {
-        return function(value) {
-            var val = value/64;
-            if (val > 1) val = 1 + (val - 1) * 3;
-            engine.setValue(channel, control, val);
         }
     }
     
@@ -514,15 +496,15 @@ StantonSCS3m.Agent = function(device) {
             }
             
             expect(part.eq.high.slide, eqsideheld.choose(
-                setgain(channel, 'filterHigh'),
+                set(channel, 'filterHigh'),
                 reset(channel, 'filterHigh', 1)
             ));
             expect(part.eq.mid.slide, eqsideheld.choose(
-                setgain(channel, 'filterMid'),
+                set(channel, 'filterMid'),
                 reset(channel, 'filterMid', 1)
             ));
             expect(part.eq.low.slide, eqsideheld.choose(
-                setgain(channel, 'filterLow'),
+                set(channel, 'filterLow'),
                 reset(channel, 'filterLow', 1)
             ));
             watch(channel, 'filterHigh',gainpatch(offcenter(part.eq.high.meter.centerbar)));
@@ -599,14 +581,14 @@ StantonSCS3m.Agent = function(device) {
             expect(device.left.pitch.slide, 
                 eqheld.left.engaged() || fxheld.left.engaged()
                 ? reset('[Master]', 'headMix', -1)
-                : setcenter('[Master]', 'headMix')
+                : set('[Master]', 'headMix')
             );
             
             watch("[Master]", "balance", centerpatch(device.right.pitch.meter.centerbar));
             expect(device.right.pitch.slide, 
                 eqheld.right.engaged() || fxheld.right.engaged()
                 ? reset('[Master]', 'balance', 0)
-                : setcenter('[Master]', 'balance')
+                : set('[Master]', 'balance')
             );
             
             tellslowly([
@@ -630,7 +612,7 @@ StantonSCS3m.Agent = function(device) {
         if (fxheld.left.engaged() || fxheld.right.engaged()) {
             // Handled in Side()
         } else {
-            expect(device.crossfader.slide, setcenter("[Master]", "crossfader"));
+            expect(device.crossfader.slide, set("[Master]", "crossfader"));
             watch("[Master]", "crossfader", centerpatch(device.crossfader.meter.centerbar));
         }
     }
