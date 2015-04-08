@@ -242,7 +242,13 @@ StantonSCS3m.Agent = function(device) {
         var ctrl = channel + control;
 
         if (!watched[ctrl]) {
-            engine.connectControl(channel, control, function(value) { watched[ctrl](value); });
+            engine.connectControl(channel, control, function(value, group, control) {
+                if (watched[ctrl]) {
+                    // Fetching parameter value is easier than mapping to [0..1] range ourselves
+                    value = engine.getParameter(group, control);
+                    watched[ctrl](value); 
+                }
+            });
         }
         watched[ctrl] = handler;
         
@@ -355,32 +361,10 @@ StantonSCS3m.Agent = function(device) {
         }
     }    
     
-    // Handle gain values [0..4]
-    // Center is 1.0
-    // Engine values over 1.0 are overweighted so they reach max lights before engine value reaches 4.0.
-    function gainpatch(translator) {
-        return function(value) {
-            if (value <= 1.0) {
-                value = value / 2;
-            } else {
-                value = 0.5 + (value - 1) / 4
-            }
-            tell(translator(value));
-        }
-    }
-    
-    // Cut off at 0.01
+    // Cut off at 0.01 because it drops off very slowly
     function vupatch(translator) {
         return function(value) {
             value = value * 1.01 - 0.01;
-            tell(translator(value));
-        }
-    }
-    
-    // For engine values [-1..1]
-    function centerpatch(translator) {
-        return function(value) {
-            value = (value + 1) / 2;
             tell(translator(value));
         }
     }
@@ -507,9 +491,9 @@ StantonSCS3m.Agent = function(device) {
                 set(channel, 'filterLow'),
                 reset(channel, 'filterLow', 1)
             ));
-            watch(channel, 'filterHigh',gainpatch(offcenter(part.eq.high.meter.centerbar)));
-            watch(channel, 'filterMid', gainpatch(offcenter(part.eq.mid.meter.centerbar)));
-            watch(channel, 'filterLow', gainpatch(offcenter(part.eq.low.meter.centerbar)));
+            watch(channel, 'filterHigh',patch(offcenter(part.eq.high.meter.centerbar)));
+            watch(channel, 'filterMid', patch(offcenter(part.eq.mid.meter.centerbar)));
+            watch(channel, 'filterLow', patch(offcenter(part.eq.low.meter.centerbar)));
 
             expect(part.modes.eq.touch, repatch(eqsideheld.engage));
             expect(part.modes.eq.release, repatch(eqsideheld.cancel));
@@ -539,7 +523,7 @@ StantonSCS3m.Agent = function(device) {
                         part.gain.mode.end
                     ]);
                     expect(part.gain.slide, budge(channel, 'pregain'));
-                    watch(channel, 'pregain', gainpatch(offcenter(part.gain.meter.needle)));
+                    watch(channel, 'pregain', patch(offcenter(part.gain.meter.needle)));
                 } else {
                     tellslowly([
                         part.gain.mode.absolute,
@@ -577,14 +561,14 @@ StantonSCS3m.Agent = function(device) {
         expect(device.master.touch,   repatch(master.engage));
         expect(device.master.release, repatch(master.cancel));
         if (master.engaged()) {
-            watch("[Master]", "headMix", centerpatch(device.left.pitch.meter.centerbar));
+            watch("[Master]", "headMix", patch(device.left.pitch.meter.centerbar));
             expect(device.left.pitch.slide, 
                 eqheld.left.engaged() || fxheld.left.engaged()
                 ? reset('[Master]', 'headMix', -1)
                 : set('[Master]', 'headMix')
             );
             
-            watch("[Master]", "balance", centerpatch(device.right.pitch.meter.centerbar));
+            watch("[Master]", "balance", patch(device.right.pitch.meter.centerbar));
             expect(device.right.pitch.slide, 
                 eqheld.right.engaged() || fxheld.right.engaged()
                 ? reset('[Master]', 'balance', 0)
@@ -595,14 +579,14 @@ StantonSCS3m.Agent = function(device) {
                 device.left.gain.mode.relative,
                 device.left.gain.mode.end
             ]);
-            watch("[Master]", "headVolume", gainpatch(device.left.gain.meter.centerbar));
+            watch("[Master]", "headVolume", patch(device.left.gain.meter.centerbar));
             expect(device.left.gain.slide, budge('[Master]', 'headVolume'));
             
             tellslowly([
                 device.right.gain.mode.relative,
                 device.right.gain.mode.end
             ]);
-            watch("[Master]", "volume", gainpatch(device.right.gain.meter.centerbar));
+            watch("[Master]", "volume", patch(device.right.gain.meter.centerbar));
             expect(device.right.gain.slide, budge('[Master]', 'volume'));
             
             watch("[Master]", "VuMeterL", vupatch(device.left.meter.bar));
@@ -613,7 +597,7 @@ StantonSCS3m.Agent = function(device) {
             // Handled in Side()
         } else {
             expect(device.crossfader.slide, set("[Master]", "crossfader"));
-            watch("[Master]", "crossfader", centerpatch(device.crossfader.meter.centerbar));
+            watch("[Master]", "crossfader", patch(device.crossfader.meter.centerbar));
         }
     }
     
