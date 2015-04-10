@@ -457,8 +457,19 @@ StantonSCS3m.Agent = function(device) {
         function Side(side) {
             var part = device[side];
             
+            // Light the top half or bottom half of the EQ sliders to show chosen deck
+            function deckflash(handler) {
+                return function(value) {
+                    handler(value);
+                    var lightval = deck[side].choose(1, 0); // First deck is the upper one
+                    tellslowly([part.eq.high.meter.centerbar(lightval)]);
+                    tellslowly([part.eq.mid.meter.centerbar(lightval)]);
+                    tellslowly([part.eq.low.meter.centerbar(lightval)]);
+                }
+            }
+            
             // Switch deck/channel when button is touched
-            expect(part.deck.touch, repatch(deck[side].toggle));
+            expect(part.deck.touch, deckflash(repatch(deck[side].toggle)));
             tell(part.deck.light[deck[side].choose('first', 'second')]);
 
             function either(left, right) { return (side == 'left') ? left : right }
