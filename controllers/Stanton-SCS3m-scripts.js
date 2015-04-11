@@ -113,11 +113,8 @@ StantonSCS3m.Device = function() {
         function Deck() {
             var id = either(0x10, 0x0F);
             return {
-                light: {
-                    off: [NoteOn, id, 0],
-                    first: [NoteOn, id, 1],
-                    second: [NoteOn, id, 2],
-                    both: [NoteOn, id, 3]
+                light: function (bits) {
+                    return [NoteOn, id, (bits[0] ? 1 : 0) | (bits[1] ? 2 : 0)]
                 },
                 touch: [NoteOn, id],
                 release: [NoteOff, id]
@@ -205,9 +202,6 @@ StantonSCS3m.Agent = function(device) {
     // Connected engine controls
     var watched = {};
     
-    // No operation 
-    function nop() {};
-    
     function clear() {
         receivers = {};
         slow = [];
@@ -218,7 +212,7 @@ StantonSCS3m.Agent = function(device) {
         // Instead I'm not gonna bother and just let the callbacks do nothing
         for (ctrl in watched) {
             if (watched.hasOwnProperty(ctrl)) {
-                watched[ctrl] = nop;
+                watched[ctrl] = [];
             }
         }
     }
@@ -242,16 +236,23 @@ StantonSCS3m.Agent = function(device) {
         var ctrl = channel + control;
 
         if (!watched[ctrl]) {
-            engine.connectControl(channel, control, function(value, group, control) {
-                if (watched[ctrl]) {
+            watched[ctrl] = [];
+            engine.connectControl(channel, control, function(value, group, control) { 
+                var handlers = watched[ctrl];
+                if (handlers.length) {
                     // Fetching parameter value is easier than mapping to [0..1] range ourselves
                     value = engine.getParameter(group, control);
-                    watched[ctrl](value); 
+                    
+                    var i = 0;
+                    for(; i < handlers.length; i++) {
+                        handlers[i](value);
+                    }
                 }
             });
         }
-        watched[ctrl] = handler;
         
+        watched[ctrl].push(handler);
+
         if (loading) {
             // ugly UGLY workaround
             // The device does not light meters again if they haven't changed from last value before resetting flat mode
@@ -262,7 +263,25 @@ StantonSCS3m.Agent = function(device) {
         }
         
         engine.trigger(channel, control);
-
+    }
+    
+    function watchmulti(controls, handler) {
+        var values = [];
+        var wait = controls.length
+        var i = 0;
+        for (; i < controls.length; i++) {
+            (function() {
+                var controlpos = i;
+                watch(controls[controlpos][0], controls[controlpos][1], function(value) {
+                    values[controlpos] = value;
+                    if (wait > 1) {
+                        wait -= 1;
+                    } else {
+                        handler(values);
+                    }
+                });
+            })();
+        }
     }
     
     
@@ -471,18 +490,33 @@ StantonSCS3m.Agent = function(device) {
         
         function Side(side) {
             var part = device[side];
-            
-            // Switch deck/channel when button is touched
-            expect(part.deck.touch, repatch(deck[side].toggle));
-            tell(part.deck.light[deck[side].choose('first', 'second')]);
 
             function either(left, right) { return (side == 'left') ? left : right }
 
             var channelno = deck[side].choose(either(1,2), either(3,4));
             var channel = '[Channel'+channelno+']';
             var effectchannel = '[QuickEffectRack1_[Channel'+channelno+']]';
+            var effectunit = '[EffectRack1_EffectUnit'+channelno+']';
+            var effectunit_enable = 'group_'+channel+'_enable';
             var eqsideheld = eqheld[side];
             var sideoverlay = overlay[side];
+
+            // Switch deck/channel when button is touched
+            expect(part.deck.touch, repatch(deck[side].toggle));
+            
+            // Light the corresponding deck (channel 1: A, channel 2: B, channel 3: C, channel 4: D)
+            // Make the lights blink on each beat
+            function beatlight(translator, activepos) {
+                return function(bits) {
+                    bits = bits.slice(); // clone
+                    bits[activepos] = !bits[activepos]; // Invert the bit for the light that should be on
+                    return translator(bits);
+                }
+            }
+            watchmulti([
+                ['[Channel'+either(1,2)+']', 'beat_active'],
+                ['[Channel'+either(3,4)+']', 'beat_active'],
+            ], patch(beatlight(part.deck.light, deck[side].choose(0,1))));
 
             if (!master.engaged()) {            
                 tellslowly([
@@ -497,7 +531,7 @@ StantonSCS3m.Agent = function(device) {
                     watch(effectchannel, 'super1', offcenter(patch(part.pitch.meter.centerbar)));
                 }
             }
-            
+
             if (sideoverlay.engaged('eq')) {
                 expect(part.eq.high.slide, eqsideheld.choose(
                     set(channel, 'filterHigh'),
@@ -521,6 +555,7 @@ StantonSCS3m.Agent = function(device) {
             tell(part.modes.eq.light[eqsideheld.choose(sideoverlay.choose('eq', 'blue', 'red'), 'purple')]);
            
             var fxsideheld = fxheld[side];
+
             var tnr = 0;
             for (; tnr < 4; tnr++) {
                 var touch = part.touches[tnr];
@@ -568,7 +603,7 @@ StantonSCS3m.Agent = function(device) {
                     watch(effectunit_effect, 'parameter1', patch(part.eq.low.meter.needle));
                 }
             }
-            
+
             expect(part.modes.fx.touch, repatch(fxsideheld.engage));
             expect(part.modes.fx.release, repatch(fxsideheld.cancel));
             tell(part.modes.fx.light[fxsideheld.choose('blue', 'purple')]);
