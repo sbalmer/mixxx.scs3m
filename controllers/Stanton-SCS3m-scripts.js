@@ -535,15 +535,15 @@ StantonSCS3m.Agent = function(device) {
             if (sideoverlay.engaged('eq')) {
                 expect(part.eq.high.slide, eqsideheld.choose(
                     set(channel, 'filterHigh'),
-                    reset(channel, 'filterHigh', 1)
+                    reset(channel, 'filterHigh')
                 ));
                 expect(part.eq.mid.slide, eqsideheld.choose(
                     set(channel, 'filterMid'),
-                    reset(channel, 'filterMid', 1)
+                    reset(channel, 'filterMid')
                 ));
                 expect(part.eq.low.slide, eqsideheld.choose(
                     set(channel, 'filterLow'),
-                    reset(channel, 'filterLow', 1)
+                    reset(channel, 'filterLow')
                 ));
                 watch(channel, 'filterHigh',patch(offcenter(part.eq.high.meter.centerbar)));
                 watch(channel, 'filterMid', patch(offcenter(part.eq.mid.meter.centerbar)));
@@ -656,14 +656,14 @@ StantonSCS3m.Agent = function(device) {
             watch("[Master]", "headMix", patch(device.left.pitch.meter.centerbar));
             expect(device.left.pitch.slide, 
                 eqheld.left.engaged() || fxheld.left.engaged()
-                ? reset('[Master]', 'headMix', -1)
+                ? reset('[Master]', 'headMix')
                 : set('[Master]', 'headMix')
             );
             
             watch("[Master]", "balance", patch(device.right.pitch.meter.centerbar));
             expect(device.right.pitch.slide, 
                 eqheld.right.engaged() || fxheld.right.engaged()
-                ? reset('[Master]', 'balance', 0)
+                ? reset('[Master]', 'balance')
                 : set('[Master]', 'balance')
             );
             
