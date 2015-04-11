@@ -13,7 +13,7 @@
         <controls>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x4F</midino>
                 <options>
@@ -22,7 +22,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.S3touch</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x0C</midino>
                 <options>
@@ -31,7 +31,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x48</midino>
                 <options>
@@ -40,7 +40,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.syncButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x6F</midino>
                 <options>
@@ -49,7 +49,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.B11</key>
+                <key>StantonSCS3d.receive</key>
                 <description>B11 headphone cue</description>
                 <status>0x80</status>
                 <midino>0x2C</midino>
@@ -59,7 +59,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x53</midino>
                 <options>
@@ -68,7 +68,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.Loop</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Loop</description>
                 <status>0x90</status>
                 <midino>0x22</midino>
@@ -78,7 +78,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.C1absolute</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0xB0</status>
                 <midino>0x62</midino>
                 <options>
@@ -87,7 +87,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.pitchAbsolute</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Pitch absolute</description>
                 <status>0xB0</status>
                 <midino>0x03</midino>
@@ -97,7 +97,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.tapButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x70</midino>
                 <options>
@@ -106,7 +106,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.EQ</key>
+                <key>StantonSCS3d.receive</key>
                 <description>EQ</description>
                 <status>0x80</status>
                 <midino>0x26</midino>
@@ -116,7 +116,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.S5absolute</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0xB0</status>
                 <midino>0x0E</midino>
                 <options>
@@ -125,7 +125,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x4E</midino>
                 <options>
@@ -134,7 +134,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.FX</key>
+                <key>StantonSCS3d.receive</key>
                 <description>FX</description>
                 <status>0x80</status>
                 <midino>0x20</midino>
@@ -144,7 +144,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.gainRelative</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Gain slider relative mode</description>
                 <status>0xB0</status>
                 <midino>0x08</midino>
@@ -154,7 +154,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.B14</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x32</midino>
                 <options>
@@ -163,7 +163,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.cueButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x6E</midino>
                 <options>
@@ -172,7 +172,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x48</midino>
                 <options>
@@ -181,7 +181,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.B11</key>
+                <key>StantonSCS3d.receive</key>
                 <description>B11 headphone cue</description>
                 <status>0x90</status>
                 <midino>0x2C</midino>
@@ -191,7 +191,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.S4relative</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0xB0</status>
                 <midino>0x02</midino>
                 <options>
@@ -200,7 +200,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.syncButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x6F</midino>
                 <options>
@@ -209,7 +209,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x53</midino>
                 <options>
@@ -218,7 +218,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x4C</midino>
                 <options>
@@ -227,7 +227,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.B13</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x30</midino>
                 <options>
@@ -236,7 +236,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.EQ</key>
+                <key>StantonSCS3d.receive</key>
                 <description>EQ</description>
                 <status>0x90</status>
                 <midino>0x26</midino>
@@ -246,7 +246,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.C1touch</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x62</midino>
                 <options>
@@ -255,7 +255,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.gain</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Gain slider</description>
                 <status>0xB0</status>
                 <midino>0x07</midino>
@@ -265,7 +265,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.pitchTouch</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Pitch touch</description>
                 <status>0x80</status>
                 <midino>0x03</midino>
@@ -275,7 +275,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.DeckButton</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Deck</description>
                 <status>0x80</status>
                 <midino>0x2A</midino>
@@ -285,7 +285,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.playButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x6D</midino>
                 <options>
@@ -294,7 +294,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.S5touch</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x0E</midino>
                 <options>
@@ -303,7 +303,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x51</midino>
                 <options>
@@ -312,7 +312,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.FX</key>
+                <key>StantonSCS3d.receive</key>
                 <description>FX</description>
                 <status>0x90</status>
                 <midino>0x20</midino>
@@ -322,7 +322,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.S4absolute</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0xB0</status>
                 <midino>0x01</midino>
                 <options>
@@ -331,7 +331,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.cueButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x6E</midino>
                 <options>
@@ -340,7 +340,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.Vinyl</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Vinyl</description>
                 <status>0x80</status>
                 <midino>0x24</midino>
@@ -350,7 +350,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.S3absolute</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0xB0</status>
                 <midino>0x0C</midino>
                 <options>
@@ -359,7 +359,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x4C</midino>
                 <options>
@@ -368,7 +368,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.B13</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x30</midino>
                 <options>
@@ -377,7 +377,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.C1touch</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x62</midino>
                 <options>
@@ -386,7 +386,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.pitchTouch</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Pitch touch</description>
                 <status>0x90</status>
                 <midino>0x03</midino>
@@ -396,7 +396,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.DeckButton</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Deck</description>
                 <status>0x90</status>
                 <midino>0x2A</midino>
@@ -406,7 +406,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.playButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x6D</midino>
                 <options>
@@ -415,7 +415,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.S5touch</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x0E</midino>
                 <options>
@@ -424,7 +424,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x51</midino>
                 <options>
@@ -433,7 +433,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x4A</midino>
                 <options>
@@ -442,7 +442,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.B12</key>
+                <key>StantonSCS3d.receive</key>
                 <description>B12</description>
                 <status>0x80</status>
                 <midino>0x2E</midino>
@@ -452,7 +452,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x55</midino>
                 <options>
@@ -461,7 +461,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.Vinyl</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Vinyl</description>
                 <status>0x90</status>
                 <midino>0x24</midino>
@@ -471,7 +471,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.S4touch</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x01</midino>
                 <options>
@@ -480,7 +480,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.Trig</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Trig</description>
                 <status>0x80</status>
                 <midino>0x28</midino>
@@ -490,7 +490,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.S3touch</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x0C</midino>
                 <options>
@@ -499,7 +499,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x4F</midino>
                 <options>
@@ -508,7 +508,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.Loop</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Loop</description>
                 <status>0x80</status>
                 <midino>0x22</midino>
@@ -518,7 +518,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.tapButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x70</midino>
                 <options>
@@ -527,7 +527,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.C1relative</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0xB0</status>
                 <midino>0x63</midino>
                 <options>
@@ -536,7 +536,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x4A</midino>
                 <options>
@@ -545,7 +545,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.B12</key>
+                <key>StantonSCS3d.receive</key>
                 <description>B12</description>
                 <status>0x90</status>
                 <midino>0x2E</midino>
@@ -555,7 +555,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.pitch</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Pitch slider</description>
                 <status>0xB0</status>
                 <midino>0x04</midino>
@@ -565,7 +565,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.statusResponse</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Device status inquiry response</description>
                 <status>0xF0</status>
                 <options>
@@ -574,7 +574,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x55</midino>
                 <options>
@@ -583,7 +583,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.S5relative</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0xB0</status>
                 <midino>0x0F</midino>
                 <options>
@@ -592,7 +592,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.SurfaceButton</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x4E</midino>
                 <options>
@@ -601,7 +601,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.B14</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x80</status>
                 <midino>0x32</midino>
                 <options>
@@ -610,7 +610,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.S4touch</key>
+                <key>StantonSCS3d.receive</key>
                 <status>0x90</status>
                 <midino>0x01</midino>
                 <options>
@@ -619,7 +619,7 @@
             </control>
             <control>
                 <group>[Master]</group>
-                <key>StantonSCS3d.Trig</key>
+                <key>StantonSCS3d.receive</key>
                 <description>Trig</description>
                 <status>0x90</status>
                 <midino>0x28</midino>
