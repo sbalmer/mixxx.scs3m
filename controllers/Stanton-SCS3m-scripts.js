@@ -2,22 +2,20 @@
 
 // issues:
 // - filterHigh/Mid/Low is deprecated, what is the replacement? 
-// - fx controls use setParameter() to set the control, but the returned values are controller values with different min/max so they don't light correctly on the device
 
-// for g in $(seq 0 255); do l=$(printf '%02x\n' $g); for n in $(seq 0 255); do h=$(printf "%02x" $n); echo $h$l; amidi -p hw:1 -S B0${h}${l}; done; done;
-// amidi -p hw:1 -S F00001601501F7
+// manually test messages
+// amidi -p hw:1 -S F00001601501F7 # flat mode
+// amidi -p hw:1 -S 900302 # 90: note on, 03: id of a touch button, 02: red LED
 
 StantonSCS3m = {
-    timer: false,
-    debugging: false
+    timer: false
 }
 
-StantonSCS3m.init = function(id, debugging) {
-    this.debugging = debugging;
-    this.device = this.Device(0); // Assuming channel is 0 eh?
+StantonSCS3m.init = function(id) {
+    this.device = this.Device();
     this.agent = this.Agent(this.device);
     this.agent.start();
-    this.timer = engine.beginTimer(40, this.agent.tick);
+    this.timer = engine.beginTimer(20, this.agent.tick);
 }
 
 StantonSCS3m.shutdown = function() {
@@ -26,20 +24,20 @@ StantonSCS3m.shutdown = function() {
 }
 
 StantonSCS3m.receive = function(channel, control, value, status) {
-    StantonSCS3m.agent.receive(channel|status, control, value)
+    StantonSCS3m.agent.receive(status, control, value)
 }
 
 /* midi map */
-StantonSCS3m.Device = function(channel) {
-    var NoteOn = 0x90 + channel;
-    var NoteOff = 0x80 + channel;
-    var CC = 0xB0 + channel;
+StantonSCS3m.Device = function() {
+    var NoteOn = 0x90;
+    var NoteOff = 0x80;
+    var CC = 0xB0;
     var CM = 0xBF; /* this is used for slider mode changes (absolute/relative, sending a control change on channel 16!?) */
     
     var black = 0x00;
     var blue = 0x01;
     var red = 0x02;
-    var purple = 0x03;
+    var purple = blue | red;
     
     function Logo() {
         var id = 0x69;
@@ -175,6 +173,7 @@ StantonSCS3m.Device = function(channel) {
     }
     
     return {
+        factory: [0xF0, 0x00, 0x01, 0x60, 0x40, 0xF7],
         flat: [0xF0, 0x00, 0x01, 0x60, 0x15, 0x01, 0xF7],
         lightsoff: [CC, 0x7B, 0x00],
         logo: Logo(),
@@ -195,7 +194,7 @@ StantonSCS3m.Agent = function(device) {
     // This is necessary because some messages must be sent with delay lest
     // the device becomes confused
     var loading = true;
-    var throttling = false;
+    var throttling = true;
     var slow = [];
     var slowterm = [];
     var pipe = [];
@@ -243,19 +242,23 @@ StantonSCS3m.Agent = function(device) {
         var ctrl = channel + control;
 
         if (!watched[ctrl]) {
-            engine.connectControl(channel, control, function(value) { watched[ctrl](value); });
+            engine.connectControl(channel, control, function(value, group, control) {
+                if (watched[ctrl]) {
+                    // Fetching parameter value is easier than mapping to [0..1] range ourselves
+                    value = engine.getParameter(group, control);
+                    watched[ctrl](value); 
+                }
+            });
         }
         watched[ctrl] = handler;
         
         if (loading) {
             // ugly UGLY workaround
             // The device does not light meters again if they haven't changed from last value before resetting flat mode
-            // so we tell it some bullshit values which causes awful flicker, luckily only during startup
+            // so we send each control some bullshit values which causes awful flicker during startup
             // The trigger will then set things straight
-            tell(handler(-0.5));
-            tell(handler(0.5));
-            tell(handler(0));
-            tell(handler(1));
+            tell(handler(100));
+            tell(handler(-100));
         }
         
         engine.trigger(channel, control);
@@ -316,7 +319,7 @@ StantonSCS3m.Agent = function(device) {
         // Send messages where the device needs a pause after
         while (messages = slow.shift()) {
             // There are usually two messages, one to tell the device
-            // what to do, and one to therminate the command
+            // what to do, and one to terminate the command
             message = messages.shift();
             
             // Drop by drop
@@ -335,21 +338,18 @@ StantonSCS3m.Agent = function(device) {
                 }
             }
         }
-
         // And flush
-        while (message = pipe.shift()) {
-            sent = send(message);
+        
+        while (pipe.length) {
+            message = pipe.shift();
+            sent = message && send(message); // Bug: There are undefined values in the queue, ignoring them
 
             // Device seems overwhelmed by flurry of messages on init, go easy
             if (loading && sent) return;
         }
-        
+
         // Open the pipe
         throttling = false;
-
-        // WTF is this doing here?
-        // This point is reached the first time there were no more messages queued
-        // At this point we know we're done loading
         loading = false;
     }
     
@@ -361,32 +361,10 @@ StantonSCS3m.Agent = function(device) {
         }
     }    
     
-    // Handle gain values [0..4]
-    // Center is 1.0
-    // Engine values over 1.0 are overweighted so they reach max lights before engine value reaches 4.0.
-    function gainpatch(translator) {
-        return function(value) {
-            if (value <= 1.0) {
-                value = value / 2;
-            } else {
-                value = 0.5 + (value - 1) / 4
-            }
-            tell(translator(value));
-        }
-    }
-    
-    // Cut off at 0.01
+    // Cut off at 0.01 because it drops off very slowly
     function vupatch(translator) {
         return function(value) {
             value = value * 1.01 - 0.01;
-            tell(translator(value));
-        }
-    }
-    
-    // For engine values [-1..1]
-    function centerpatch(translator) {
-        return function(value) {
-            value = (value + 1) / 2;
             tell(translator(value));
         }
     }
@@ -404,46 +382,13 @@ StantonSCS3m.Agent = function(device) {
             tell(value ? on : off);
         }
     }
-    
-    function both(h1, h2) {
-       return function() {
-           h1();
-           h2();
-       }
-    }
 
     // absolute control
     function set(channel, control) {
         return function(value) {
-            engine.setValue(channel, control,
-                value/127
-            );
-        }
-    }
-    
-    function setparam(channel, control) {
-        return function(value) {
             engine.setParameter(channel, control,
                 value/127
             );
-        }
-    }
-
-    // absolute centered control
-    function setcenter(channel, control) {
-        return function(value) {
-            engine.setValue(channel, control,
-                (value-64)/63
-            );
-        }
-    }
-    
-    // Gain values in Mixx go from 0 to 4
-    function setgain(channel, control) {
-        return function(value) {
-            var val = value/64;
-            if (val > 1) val = 1 + (val - 1) * 3;
-            engine.setValue(channel, control, val);
         }
     }
     
@@ -555,20 +500,20 @@ StantonSCS3m.Agent = function(device) {
             
             if (sideoverlay.engaged('eq')) {
                 expect(part.eq.high.slide, eqsideheld.choose(
-                    setgain(channel, 'filterHigh'),
-                    reset(channel, 'filterHigh')
+                    set(channel, 'filterHigh'),
+                    reset(channel, 'filterHigh', 1)
                 ));
                 expect(part.eq.mid.slide, eqsideheld.choose(
-                    setgain(channel, 'filterMid'),
-                    reset(channel, 'filterMid')
+                    set(channel, 'filterMid'),
+                    reset(channel, 'filterMid', 1)
                 ));
                 expect(part.eq.low.slide, eqsideheld.choose(
-                    setgain(channel, 'filterLow'),
-                    reset(channel, 'filterLow')
+                    set(channel, 'filterLow'),
+                    reset(channel, 'filterLow', 1)
                 ));
-                watch(channel, 'filterHigh', gainpatch(offcenter(part.eq.high.meter.centerbar)));
-                watch(channel, 'filterMid', gainpatch(offcenter(part.eq.mid.meter.centerbar)));
-                watch(channel, 'filterLow', gainpatch(offcenter(part.eq.low.meter.centerbar)));
+                watch(channel, 'filterHigh',patch(offcenter(part.eq.high.meter.centerbar)));
+                watch(channel, 'filterMid', patch(offcenter(part.eq.mid.meter.centerbar)));
+                watch(channel, 'filterLow', patch(offcenter(part.eq.low.meter.centerbar)));
             }
 
             expect(part.modes.eq.touch, repatch(eqsideheld.engage));
@@ -607,15 +552,15 @@ StantonSCS3m.Agent = function(device) {
                     watch(effectunit, 'mix', patch(part.pitch.meter.bar));
 
                     expect(part.eq.high.slide, eqsideheld.choose(
-                        setparam(effectunit_effect, 'parameter3'),
+                        set(effectunit_effect, 'parameter3'),
                         reset(effectunit_effect, 'parameter3')
                     ));
                     expect(part.eq.mid.slide, eqsideheld.choose(
-                        setparam(effectunit_effect, 'parameter2'),
+                        set(effectunit_effect, 'parameter2'),
                         reset(effectunit_effect, 'parameter2')
                     ));
                     expect(part.eq.low.slide, eqsideheld.choose(
-                        setparam(effectunit_effect, 'parameter1'),
+                        set(effectunit_effect, 'parameter1'),
                         reset(effectunit_effect, 'parameter1')
                     ));
                     watch(effectunit_effect, 'parameter3', patch(part.eq.high.meter.needle));
@@ -635,7 +580,7 @@ StantonSCS3m.Agent = function(device) {
                         part.gain.mode.end
                     ]);
                     expect(part.gain.slide, budge(channel, 'pregain'));
-                    watch(channel, 'pregain', gainpatch(offcenter(part.gain.meter.needle)));
+                    watch(channel, 'pregain', patch(offcenter(part.gain.meter.needle)));
                 } else {
                     tellslowly([
                         part.gain.mode.absolute,
@@ -673,32 +618,32 @@ StantonSCS3m.Agent = function(device) {
         expect(device.master.touch,   repatch(master.engage));
         expect(device.master.release, repatch(master.cancel));
         if (master.engaged()) {
-            watch("[Master]", "headMix", centerpatch(device.left.pitch.meter.centerbar));
+            watch("[Master]", "headMix", patch(device.left.pitch.meter.centerbar));
             expect(device.left.pitch.slide, 
                 eqheld.left.engaged() || fxheld.left.engaged()
                 ? reset('[Master]', 'headMix', -1)
-                : setcenter('[Master]', 'headMix')
+                : set('[Master]', 'headMix')
             );
             
-            watch("[Master]", "balance", centerpatch(device.right.pitch.meter.centerbar));
+            watch("[Master]", "balance", patch(device.right.pitch.meter.centerbar));
             expect(device.right.pitch.slide, 
                 eqheld.right.engaged() || fxheld.right.engaged()
                 ? reset('[Master]', 'balance', 0)
-                : setcenter('[Master]', 'balance')
+                : set('[Master]', 'balance')
             );
             
             tellslowly([
                 device.left.gain.mode.relative,
                 device.left.gain.mode.end
             ]);
-            watch("[Master]", "headVolume", gainpatch(device.left.gain.meter.centerbar));
+            watch("[Master]", "headVolume", patch(device.left.gain.meter.centerbar));
             expect(device.left.gain.slide, budge('[Master]', 'headVolume'));
             
             tellslowly([
                 device.right.gain.mode.relative,
                 device.right.gain.mode.end
             ]);
-            watch("[Master]", "volume", gainpatch(device.right.gain.meter.centerbar));
+            watch("[Master]", "volume", patch(device.right.gain.meter.centerbar));
             expect(device.right.gain.slide, budge('[Master]', 'volume'));
             
             watch("[Master]", "VuMeterL", vupatch(device.left.meter.bar));
@@ -708,8 +653,8 @@ StantonSCS3m.Agent = function(device) {
         if (fxheld.left.engaged() || fxheld.right.engaged()) {
             // Handled in Side()
         } else {
-            expect(device.crossfader.slide, setcenter("[Master]", "crossfader"));
-            watch("[Master]", "crossfader", centerpatch(device.crossfader.meter.centerbar));
+            expect(device.crossfader.slide, set("[Master]", "crossfader"));
+            watch("[Master]", "crossfader", patch(device.crossfader.meter.centerbar));
         }
     }
     
