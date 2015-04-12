@@ -491,6 +491,21 @@ StantonSCS3m.Agent = function(device) {
         function Side(side) {
             var part = device[side];
 
+            // Light the top half or bottom half of the EQ sliders to show chosen deck
+            function deckflash(handler) {
+                return function(value) {
+                    handler(value);
+                    var lightval = deck[side].choose(1, 0); // First deck is the upper one
+                    tellslowly([part.eq.high.meter.centerbar(lightval)]);
+                    tellslowly([part.eq.mid.meter.centerbar(lightval)]);
+                    tellslowly([part.eq.low.meter.centerbar(lightval)]);
+                }
+            }
+            
+            // Switch deck/channel when button is touched
+            expect(part.deck.touch, deckflash(repatch(deck[side].toggle)));
+            tell(part.deck.light[deck[side].choose('first', 'second')]);
+
             function either(left, right) { return (side == 'left') ? left : right }
 
             var channelno = deck[side].choose(either(1,2), either(3,4));
@@ -500,9 +515,6 @@ StantonSCS3m.Agent = function(device) {
             var effectunit_enable = 'group_'+channel+'_enable';
             var eqsideheld = eqheld[side];
             var sideoverlay = overlay[side];
-
-            // Switch deck/channel when button is touched
-            expect(part.deck.touch, repatch(deck[side].toggle));
             
             // Light the corresponding deck (channel 1: A, channel 2: B, channel 3: C, channel 4: D)
             // Make the lights blink on each beat
