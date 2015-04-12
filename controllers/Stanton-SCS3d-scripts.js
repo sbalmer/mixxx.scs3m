@@ -1,4 +1,17 @@
-StantonSCS3m.Device = function(channel) {
+StantonSCS3m = {
+    timer: false
+}
+
+StantonSCS3d.init = function(id) {
+    this.device = this.Device();
+    this.agent = this.Agent(this.device);
+    this.agent.start();
+    this.timer = engine.beginTimer(20, this.agent.tick);
+}
+
+
+/* MIDI map */
+StantonSCS3d.Device = function(channel) {
     var NoteOn = 0x90 + channel;
     var NoteOff = 0x80 + channel;
     var CC = 0xB0 + channel;
@@ -17,11 +30,18 @@ StantonSCS3m.Device = function(channel) {
     }
     
     function Meter(id, lights) {
+        // Returns messages that light or extinguish the individual LED
+        // of the meter. sel() is called for each light [1..lights]
+        // and must return a boolean 
         function bitlights(sel) {
-            var i = 1;
             var msgs = new Array(lights);
-            for (; i <= lights) {
-                msgs[i] = [NoteOn, id + lights - i, sel(i);
+            
+            // The meter lights are enumerated top-bottom
+            // The sel() function gets lowest led = 1, top led = lights
+            var i = 1;
+            var maxlight = id + lights;
+            for (; i <= lights; i++) {
+                msgs[i] = [NoteOn, maxlight - i, +sel(i);
             }
             return msgs;
         }
@@ -60,14 +80,6 @@ StantonSCS3m.Device = function(channel) {
             }
         }
     }
-    
-    function Slider(id, lights) {
-        return {
-            meter: Meter(id, lights),
-            slide: [CC, id],
-            relslide: [CC, id + 1]
-        }
-    }
         
     function Light(id) {
         return {
@@ -76,6 +88,22 @@ StantonSCS3m.Device = function(channel) {
             red: [NoteOn, id, red],
             purple: [NoteOn, id, purple],
         }
+    }
+    
+    function Slider(id, meterid, lights) {
+        return {
+            meter: Meter(meterid, lights),
+            slide: {
+                abs: [CC, id],
+                rel: [CC, id + 1]
+            }
+        }
+    }
+    
+    function LightedSlider(id, meterid, lights, lightid) {
+        var slider = Slider(id, meterid, lights);
+        slider.light = Light(lightid);
+        return slider;
     }
         
     function Touch(id) {
@@ -88,6 +116,30 @@ StantonSCS3m.Device = function(channel) {
 
     return {
         flat: [0xF0, 0x7E, channel, 0x06, 0x01, 0xF7],
-        logo: Logo()
+        logo: Logo(),
+        gain: LightedSlider(0x07, 0x34, 9, 0x71);
+        pitch: LightedSlider(0x03, 0x3F, 9, 0x72);
+        mode: {
+            fx: Touch(0x20),
+            loop: Touch(0x22),
+            vinyl: Touch(0x24),
+            eq: Touch(0x26),
+            trig: Touch(0x28),
+            deck: Touch(0x2A),
+        },
+        top: {
+            left: Touch(0x2C),
+            right: Touch(0x2E)
+        },
+        circle: Slider(0x62, 0x5d, 16),
+        center: {
+            left: Slider(0x0C, 0x48, 7),
+            middle: Slider(0x01, 0x56, 7),
+            right: Slider(0x0E, 0x4F, 7)
+        },
+        bottom: {
+            left: Touch(0x30),
+            right: Touch(0x32)
+        }
     }
 }
