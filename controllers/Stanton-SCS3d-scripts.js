@@ -1,8 +1,7 @@
-StantonSCS3m = {
-}
+StantonSCS3d = {}
 
 StantonSCS3d.init = function(id) {
-    this.device = this.Device();
+    this.device = this.Device(0);
     this.agent = this.Agent(this.device);
     this.agent.start();
 }
@@ -12,7 +11,7 @@ StantonSCS3d.shutdown = function() {
 }
 
 StantonSCS3d.receive = function(channel, control, value, status) {
-    StantonSCS3d.agent.receive(status, control, value)
+    StantonSCS3d.agent.receive(status, control, value);
 }
 
 /* MIDI map */
@@ -43,10 +42,9 @@ StantonSCS3d.Device = function(channel) {
             
             // The meter lights are enumerated top-bottom
             // The sel() function gets lowest led = 1, top led = lights
-            var i = 1;
-            var maxlight = id + lights;
-            for (; i <= lights; i++) {
-                msgs[i] = [NoteOn, maxlight - i, +sel(i)];
+            var i = 0;
+            for (; i < lights; i++) {
+                msgs[i] = [NoteOn, id+i, +sel(lights-i)];
             }
             return msgs;
         }
@@ -128,8 +126,8 @@ StantonSCS3d.Device = function(channel) {
             button: [0xF0, 0x00, 0x01, 0x60, 0x01, 0x04, 0xF7]
         },
         logo: Logo(),
-        gain: LightedSlider(0x07, 0x34, 9, 0x71);
-        pitch: LightedSlider(0x03, 0x3F, 9, 0x72);
+        gain: LightedSlider(0x07, 0x34, 9, 0x71),
+        pitch: LightedSlider(0x03, 0x3F, 9, 0x72),
         mode: {
             fx: Touch(0x20),
             loop: Touch(0x22),
@@ -160,7 +158,7 @@ StantonSCS3d.Device = function(channel) {
 }
 
 
-StantonSCS3m.Agent = function(device) {
+StantonSCS3d.Agent = function(device) {
     // Cache last sent bytes to avoid sending duplicates.
     // The second byte of each message (controller id) is used as key to hold
     // the last sent message for each controller.
@@ -229,17 +227,8 @@ StantonSCS3m.Agent = function(device) {
                 }
             });
         }
-        
-        watched[ctrl].push(handler);
 
-        if (loading) {
-            // ugly UGLY workaround
-            // The device does not light meters again if they haven't changed from last value before resetting flat mode
-            // so we send each control some bullshit values which causes awful flicker during startup
-            // The trigger will then set things straight
-            tell(handler(100));
-            tell(handler(-100));
-        }
+        watched[ctrl].push(handler);
         
         engine.trigger(channel, control);
     }
@@ -270,8 +259,13 @@ StantonSCS3m.Agent = function(device) {
     // Returns whether the massage was sent
     // False is returned if the mesage was sent before.
     function tell(message, force) {
+        if (message.length > 3) {
+            midi.sendSysexMsg(message, message.length);
+            return true;
+        }
+
         var address = (message[0] << 8) + message[1];
-        
+
         if (!force && last[address] === message[2]) {
             return false; // Not repeating same message
         }
@@ -279,7 +273,7 @@ StantonSCS3m.Agent = function(device) {
         midi.sendShortMsg(message[0], message[1], message[2]);
 
         last[address] = message[2];
-        
+
         return true;
     }
     
@@ -289,6 +283,15 @@ StantonSCS3m.Agent = function(device) {
     function patch(translator) {
         return function(value) {
             tell(translator(value));
+        }
+    }  
+    
+    function patchleds(translator) {
+        return function(value) {
+            var msgs = translator(value);
+            for (i in msgs) {
+                if (msgs.hasOwnProperty(i)) tell(msgs[i]);
+            }
         }
     }    
     
@@ -386,6 +389,20 @@ StantonSCS3m.Agent = function(device) {
         tell(device.logo.on);
 
         expect(device.gain.slide.abs, set(channel, 'volume'));
-        watch(channel, 'volume', patch(device.left));
+        watch(channel, 'volume', patchleds(device.gain.meter.bar));
+    }
+    
+    return {
+        start: function() {
+            loading = true;
+            tell(device.modeset.flat);
+            patchage();
+        },
+        receive: receive,
+        stop: function() {
+            clear();
+            tell(device.lightsoff);
+            send(device.logo.on, true);
+        }
     }
 }
