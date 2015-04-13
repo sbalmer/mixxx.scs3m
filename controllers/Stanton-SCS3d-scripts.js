@@ -9,6 +9,14 @@ StantonSCS3d.init = function(id) {
     this.timer = engine.beginTimer(20, this.agent.tick);
 }
 
+StantonSCS3d.shutdown = function() {
+    if (StantonSCS3d.timer) engine.stopTimer(StantonSCS3d.timer);
+    StantonSCS3d.agent.stop();
+}
+
+StantonSCS3d.receive = function(channel, control, value, status) {
+    StantonSCS3d.agent.receive(status, control, value)
+}
 
 /* MIDI map */
 StantonSCS3d.Device = function(channel) {
@@ -41,7 +49,7 @@ StantonSCS3d.Device = function(channel) {
             var i = 1;
             var maxlight = id + lights;
             for (; i <= lights; i++) {
-                msgs[i] = [NoteOn, maxlight - i, +sel(i);
+                msgs[i] = [NoteOn, maxlight - i, +sel(i)];
             }
             return msgs;
         }
@@ -143,3 +151,4 @@ StantonSCS3d.Device = function(channel) {
         }
     }
 }
+
