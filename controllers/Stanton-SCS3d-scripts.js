@@ -33,6 +33,12 @@ StantonSCS3d.Device = function(channel) {
         }
     }
     
+    function Decklight(id) {
+        return function(value) {
+            return [NoteOn, id, +value]; // value might be boolean, coerce to int
+        };
+    }
+    
     function Meter(id, lights) {
         // Returns messages that light or extinguish the individual LED
         // of the meter. sel() is called for each light [1..lights]
@@ -103,15 +109,22 @@ StantonSCS3d.Device = function(channel) {
         }
     }
     
-    function LightedSlider(id, meterid, lights, lightid) {
+    function LightedSlider(id, meterid, lights) {
         var slider = Slider(id, meterid, lights);
-        slider.light = Light(lightid);
+        slider.light = Light(meterid-2);
         return slider;
     }
         
     function Touch(id) {
         return {
             light: Light(id),
+            touch: [NoteOn, id],
+            release: [NoteOff, id]
+        }
+    }
+        
+    function Field(id) {
+        return {
             touch: [NoteOn, id],
             release: [NoteOff, id]
         }
@@ -126,8 +139,12 @@ StantonSCS3d.Device = function(channel) {
             button: [0xF0, 0x00, 0x01, 0x60, 0x01, 0x04, 0xF7]
         },
         logo: Logo(),
-        gain: LightedSlider(0x07, 0x34, 9, 0x71),
-        pitch: LightedSlider(0x03, 0x3F, 9, 0x72),
+        decklights: [
+            Decklight(0x71), // A
+            Decklight(0x72)  // B
+        ],
+        gain: LightedSlider(0x07, 0x34, 9),
+        pitch: LightedSlider(0x03, 0x3F, 9),
         mode: {
             fx: Touch(0x20),
             loop: Touch(0x22),
@@ -146,13 +163,19 @@ StantonSCS3d.Device = function(channel) {
             middle: Slider(0x01, 0x56, 7),
             right: Slider(0x0E, 0x4F, 7)
         },
-        largefield: [
+        field: [
             Touch([0x48, 0x4A]),
             Touch([0x48, 0x4A]),
         ],
         bottom: {
             left: Touch(0x30),
             right: Touch(0x32)
+        },
+        button: {
+            play: Touch(0x6D),
+            cue: Touch(0x6E),
+            sync: Touch(0x6F),
+            tap: Touch(0x70),
         }
     }
 }
@@ -394,7 +417,6 @@ StantonSCS3d.Agent = function(device) {
     
     return {
         start: function() {
-            loading = true;
             tell(device.modeset.flat);
             patchage();
         },
