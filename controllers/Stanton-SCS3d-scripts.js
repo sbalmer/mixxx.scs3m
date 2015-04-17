@@ -1,4 +1,4 @@
-StantonSCS3d = {}
+StantonSCS3d = {};
 
 StantonSCS3d.init = function(id) {
     this.device = this.Device(0);
