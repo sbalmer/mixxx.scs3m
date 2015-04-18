@@ -376,7 +376,7 @@ StantonSCS3m.Agent = function(device) {
             // If you want to adjust it, fiddle with the exponent (second argument to pow())
             return translator(Math.pow(Math.abs(value - 0.5) * 2, 0.6) / (value < 0.5 ? -2 : 2) + 0.5)
         }
-    }
+    }    
     
     function binarylight(off, on) {
         return function(value) {
@@ -600,6 +600,14 @@ StantonSCS3m.Agent = function(device) {
             expect(device.crossfader.slide, set("[Master]", "crossfader"));
             watch("[Master]", "crossfader", patch(device.crossfader.meter.centerbar));
         }
+        
+        // Communicate currently selected channel of each deck so SCS3d can read it
+        // THIS USES A CONTROL FOR ULTERIOR PURPOSES AND IS VERY NAUGHTY INDEED
+        reset('[PreviewDeck1]', 'quantize', 
+              0x4 // Setting bit three communicates that we're sending deck state
+                | deck.left.engaged() // left side is in bit one
+                | deck.right.engaged() << 1 // right side bit two
+        )(); // Doesn't violate the Geneva conventions
     }
     
     return {

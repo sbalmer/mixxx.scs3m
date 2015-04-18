@@ -92,6 +92,7 @@ StantonSCS3d.Device = function(channel) {
         
     function Light(id) {
         return {
+            bits: function(bits) { return [NoteOn, id, bits]; },
             black: [NoteOn, id, black],
             blue: [NoteOn, id, blue],
             red: [NoteOn, id, red],
@@ -139,7 +140,7 @@ StantonSCS3d.Device = function(channel) {
             button: [0xF0, 0x00, 0x01, 0x60, 0x01, 0x04, 0xF7]
         },
         logo: Logo(),
-        decklights: [
+        decklight: [
             Decklight(0x71), // A
             Decklight(0x72)  // B
         ],
@@ -376,10 +377,16 @@ StantonSCS3d.Agent = function(device) {
 
     function Switch() {
         var engaged = false;
+        function change(state) {
+            var prev = engaged;
+            engaged = !!state; // Coerce to bool
+            return engaged !== prev;
+        }
         return {
-            'engage': function() { engaged = true; },
-            'cancel': function() { engaged = false; },
-            'toggle': function() { engaged = !engaged; },
+            'change': function(state) { return change(state); },
+            'engage': function() { return change(true); },
+            'cancel': function() { return change(false); },
+            'toggle': function() { return change(!engaged); },
             'engaged': function() { return engaged; },
             'choose': function(off, on) { return engaged ? on : off; }
         }
@@ -387,32 +394,86 @@ StantonSCS3d.Agent = function(device) {
     
     function Multiswitch(preset) {
         var engaged = preset;
+        function change(state) {
+            var prev = engaged;
+            engaged = state;
+            return engaged !== prev;
+        }
         return {
-            'engage': function(pos) { return function() { engaged = pos; }  },
-            'cancel': function(pos) { return function() { if (engaged === pos) engaged = preset; } },
+            'engage': function(pos) { return function() { return change(pos); } },
             'engaged': function(pos) { return engaged === pos },
             'choose': function(pos, off, on) { return (engaged === pos) ? on : off; }
         }
     }
     
-    var mode = Multiswitch('vinyl');
+    // mode for each channel
+    var mode = {
+        1: Multiswitch('vinyl'),
+        2: Multiswitch('vinyl'),
+        3: Multiswitch('vinyl'),
+        4: Multiswitch('vinyl')
+    };
+    
+    // left: false
+    // right: true
+    
+    // What side we're on
+    var side = Switch();
+    
+    // What channel is selected on either side
+    var activeChannel = [
+        Switch(), // Selected channel on the left (1 or 3)
+        Switch()  // Selected channel on the right (2 or 4)
+    ];
+    
+    // Glean current channels from control value
+    // This part is willfully obtuse and a bad idea
+    function gleanChannel(value) {
+        // Changed must be set to true if the deck was changed on the current side
+        var changed = false;
+        
+        // check third bit and proceed if it's set
+        // otherwise the control is assumed not to carry deck information
+        if (value & 0x4) {
+            changed = 
+                   activeChannel[0].change(value & 0x1) && !side.engaged() // Left side carried in first bit
+                || activeChannel[1].change(value & 0x2) && side.engaged(); // Right side in second bit
+        }
+        return changed;
+    }
     
     function repatch(handler) {
         return function(value) {
-            throttling = true;
-            handler(value);
-            clear();
-            patchage();
+            var changed = handler(value);
+            if (changed) {
+                clear();
+                patchage();
+            }
         }
     }
     
     function patchage() {
-        var channel = '[Channel1]'; // sometimes correct
+        // You win two insanity points if you don't properly misunderstand this
+        var channelno = activeChannel[side.choose(0, 1)].choose(side.choose(1, 2), side.choose(3, 4));
+        tell(device.mode.deck.light.bits(channelno-1));
+        tell(device.decklight[0](!activeChannel[side.choose(0, 1)].engaged()));
+        tell(device.decklight[1](activeChannel[side.choose(0, 1)].engaged()));
+        
+        
+        var channel = '[Channel'+channelno+']';
 
         tell(device.logo.on);
 
         expect(device.gain.slide.abs, set(channel, 'volume'));
         watch(channel, 'volume', patchleds(device.gain.meter.bar));
+        
+        // Read deck state from unrelated control which may be set by the 3m
+        // Among all the things WRONG about this, two stand out:
+        // 1. The control is not meant to transmit this information.
+        // 2. A value > 1 is expected from a control which is just a toggle (suggesting a binary value)
+        // This may fail at any future or past version of Mixxx and you have only me to blame for it.
+        watch('[PreviewDeck1]', 'quantize', repatch(gleanChannel));
+        expect(device.mode.deck.touch, repatch(side.toggle));
     }
     
     return {
