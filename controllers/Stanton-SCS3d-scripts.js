@@ -349,6 +349,12 @@ StantonSCS3d.Agent = function(device) {
             );
         }
     }
+
+    function setConst(channel, control, value) {
+        return function() {
+            engine.setParameter(channel, control, value);
+        }
+    }
     
     function reset(channel, control) {
         return function() {
@@ -466,6 +472,20 @@ StantonSCS3d.Agent = function(device) {
 
         expect(device.gain.slide.abs, set(channel, 'volume'));
         watch(channel, 'volume', patchleds(device.gain.meter.bar));
+        
+        expect(device.button.play.touch, toggle(channel, 'play'));
+        watch(channel, 'play', binarylight(device.button.play.light.black, device.button.play.light.red));
+        
+        expect(device.button.cue.touch, setConst(channel, 'cue_default', true));
+        expect(device.button.cue.release, setConst(channel, 'cue_default', false));
+        watch(channel, 'cue_default', binarylight(device.button.cue.light.black, device.button.cue.light.red));
+        
+        expect(device.button.sync.touch, setConst(channel, 'beatsync', true));
+        tell(device.button.sync.light.black);
+        
+        expect(device.button.tap.touch, function() { bpm.tapButton(channelno); });
+        watch(channel, 'beat_active', binarylight(device.button.tap.light.black, device.button.tap.light.red));
+        
         
         // Read deck state from unrelated control which may be set by the 3m
         // Among all the things WRONG about this, two stand out:
