@@ -506,11 +506,11 @@ StantonSCS3d.Agent = function(device) {
         watch(channel, 'volume', patchleds(device.gain.meter.bar));
 
         var activeMode = mode[channelno];
-        tell(device.mode.fx.light.blue);
-        tell(device.mode.eq.light.blue);
-        tell(device.mode.loop.light.blue);
-        tell(device.mode.trig.light.blue);
-        tell(device.mode.vinyl.light.blue);
+        tell(device.mode.fx.light.black);
+        tell(device.mode.eq.light.black);
+        tell(device.mode.loop.light.black);
+        tell(device.mode.trig.light.black);
+        tell(device.mode.vinyl.light.black);
         expect(device.mode.fx.touch, repatch(activeMode.engage(fxpatch)));
         expect(device.mode.eq.touch, repatch(activeMode.engage(eqpatch)));
         expect(device.mode.loop.touch, repatch(activeMode.engage(looppatch)));
