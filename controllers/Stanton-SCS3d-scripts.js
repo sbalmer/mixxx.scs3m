@@ -188,15 +188,6 @@ StantonSCS3d.Agent = function(device) {
     // the last sent message for each controller.
     var last = {};
     
-    // Keeps a queue of commands to perform
-    // This is necessary because some messages must be sent with delay lest
-    // the device becomes confused
-    var loading = true;
-    var throttling = true;
-    var slow = [];
-    var slowterm = [];
-    var pipe = [];
-    
     // Handlers for received messages
     var receivers = {};
     
@@ -205,8 +196,6 @@ StantonSCS3d.Agent = function(device) {
     
     function clear() {
         receivers = {};
-        slow = [];
-        pipe = [];
 
         // I'd like to disconnect everything on clear, but that doesn't work when using closure callbacks, I guess I'd have to pass the callback function as string name
         // I'd have to invent function names for all handlers
