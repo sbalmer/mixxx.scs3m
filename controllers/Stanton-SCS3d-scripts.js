@@ -57,7 +57,7 @@ StantonSCS3d.Device = function(channel) {
         function plain(value) {
             if (value <= 0.0) return 1;
             if (value >= 1.0) return lights;
-            return Math.round(value * (lights - 1));
+            return Math.ceil(value * lights);
         }
         function clamped(value) {
             if (value <= 0.0) return 1;
@@ -488,7 +488,16 @@ StantonSCS3d.Agent = function(device) {
         expect(device.button.tap.touch, function() { bpm.tapButton(channelno); });
         watch(channel, 'beat_active', binarylight(device.button.tap.light.black, device.button.tap.light.red));
         
-        
+        tell(device.modeset.circle);
+        watch(channel, 'playposition', patchleds(function(position) { 
+            var duration = engine.getValue(channel, 'duration');
+            var seconds = duration * position;
+            var revolutions = seconds / 1.8; // 33.3rpm
+            var offset = revolutions % 1; // Fractional part is the light's position in the circle
+            var clockwise_offset = 1 - offset;
+            return device.slider.circle.meter.needle(clockwise_offset);
+        }));
+
         // Read deck state from unrelated control which may be set by the 3m
         // Among all the things WRONG about this, two stand out:
         // 1. The control is not meant to transmit this information.
