@@ -450,12 +450,25 @@ StantonSCS3d.Agent = function(device) {
     function patchage() {
         // You win two insanity points if you don't properly misunderstand this
         var channelno = activeChannel[side.choose(0, 1)].choose(side.choose(1, 2), side.choose(3, 4));
+        var channel = '[Channel'+channelno+']';
+        
+        // The logic for the deck light is as follows: Right is red (like with
+        // cinch signaling) and the alternative decks are blue.
+        //
+        //  Deck | Left     | Right
+        // -----------------------
+        //  Main | 1: black | 2: red
+        //  Alt  | 3: blue  | 4: purple
+        //
+        // If we subtract one from the channelno this maps exactly to the SCS
+        // color coding. Don't you marvel at the clean mapping between the two
+        // concepts? I started out with this simplistic scheme, decided that it
+        // fits well, then made up reasons in favour of it. Laziness be my
+        // witness.
         tell(device.mode.deck.light.bits(channelno-1));
         tell(device.decklight[0](!activeChannel[side.choose(0, 1)].engaged()));
         tell(device.decklight[1](activeChannel[side.choose(0, 1)].engaged()));
-        
-        
-        var channel = '[Channel'+channelno+']';
+
 
         tell(device.logo.on);
 
