@@ -21,8 +21,8 @@ StantonSCS3d.Device = function(channel) {
     var CC = 0xB0 + channel;
     
     var black = 0x00;
-    var blue = 0x01;
-    var red = 0x02;
+    var blue = 0x02;
+    var red = 0x01;
     var purple = blue | red;
     
     function Logo() {
@@ -397,16 +397,17 @@ StantonSCS3d.Agent = function(device) {
         return {
             'engage': function(pos) { return function() { return change(pos); } },
             'engaged': function(pos) { return engaged === pos },
+            'active': function() { return engaged; },
             'choose': function(pos, off, on) { return (engaged === pos) ? on : off; }
         }
     }
     
     // mode for each channel
     var mode = {
-        1: Multiswitch('vinyl'),
-        2: Multiswitch('vinyl'),
-        3: Multiswitch('vinyl'),
-        4: Multiswitch('vinyl')
+        1: Multiswitch(vinylpatch),
+        2: Multiswitch(vinylpatch),
+        3: Multiswitch(vinylpatch),
+        4: Multiswitch(vinylpatch)
     };
     
     // left: false
@@ -447,6 +448,26 @@ StantonSCS3d.Agent = function(device) {
         }
     }
     
+    function fxpatch() {
+        tell(device.mode.fx.light.red);
+    }
+
+    function eqpatch() {
+        tell(device.mode.eq.light.red);
+    }
+
+    function looppatch() {
+        tell(device.mode.loop.light.red);
+    }
+
+    function trigpatch() {
+        tell(device.mode.trig.light.red);
+    }
+
+    function vinylpatch() {
+        tell(device.mode.vinyl.light.red);
+    }
+    
     function patchage() {
         // You win two insanity points if you don't properly misunderstand this
         var channelno = activeChannel[side.choose(0, 1)].choose(side.choose(1, 2), side.choose(3, 4));
@@ -474,7 +495,24 @@ StantonSCS3d.Agent = function(device) {
 
         expect(device.gain.slide.abs, set(channel, 'volume'));
         watch(channel, 'volume', patchleds(device.gain.meter.bar));
+
+        var activeMode = mode[channelno];
+        tell(device.mode.fx.light.blue);
+        tell(device.mode.eq.light.blue);
+        tell(device.mode.loop.light.blue);
+        tell(device.mode.trig.light.blue);
+        tell(device.mode.vinyl.light.blue);
+        expect(device.mode.fx.touch, repatch(activeMode.engage(fxpatch)));
+        expect(device.mode.eq.touch, repatch(activeMode.engage(eqpatch)));
+        expect(device.mode.loop.touch, repatch(activeMode.engage(looppatch)));
+        expect(device.mode.trig.touch, repatch(activeMode.engage(trigpatch)));
+        expect(device.mode.vinyl.touch, repatch(activeMode.engage(vinylpatch)));
+        expect(device.mode.deck.touch, repatch(side.toggle));
         
+        // Call the patch function that was put into the switch with engage()
+        activeMode.active()();
+        
+
         expect(device.button.play.touch, toggle(channel, 'play'));
         watch(channel, 'play', binarylight(device.button.play.light.black, device.button.play.light.red));
         
@@ -512,7 +550,6 @@ StantonSCS3d.Agent = function(device) {
         // 2. A value > 1 is expected from a control which is just a toggle (suggesting a binary value)
         // This may fail at any future or past version of Mixxx and you have only me to blame for it.
         watch('[PreviewDeck1]', 'quantize', repatch(gleanChannel));
-        expect(device.mode.deck.touch, repatch(side.toggle));
     }
     
     return {
