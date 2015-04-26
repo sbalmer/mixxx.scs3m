@@ -75,7 +75,7 @@ StantonSCS3d.Device = function(channel) {
                 return bitlights(function(bit) { return light == bit; });
             },
             centerbar: function(value) {
-                var center = (lights - 1) / 2;
+                var center = (lights - 1) / 2 + 1;
                 var extreme = clamped(value);
                 return bitlights(function(bit) { 
                     return (bit >= extreme && bit <= center) || (bit <= extreme && bit >= center);
@@ -452,8 +452,16 @@ StantonSCS3d.Agent = function(device) {
         tell(device.mode.fx.light.red);
     }
 
-    function eqpatch() {
+    function eqpatch(channel) {
+        tell(device.modeset.slider);
         tell(device.mode.eq.light.red);
+        watch(channel, 'filterLow', patchleds(device.slider.left.meter.centerbar)); 
+        watch(channel, 'filterMid', patchleds(device.slider.middle.meter.centerbar)); 
+        watch(channel, 'filterHigh', patchleds(device.slider.right.meter.centerbar));
+        
+        expect(device.slider.left.slide.abs, set(channel, 'filterLow'));
+        expect(device.slider.middle.slide.abs, set(channel, 'filterMid'));
+        expect(device.slider.right.slide.abs, set(channel, 'filterHigh'));
     }
 
     function looppatch() {
@@ -510,7 +518,7 @@ StantonSCS3d.Agent = function(device) {
         expect(device.mode.deck.touch, repatch(side.toggle));
         
         // Call the patch function that was put into the switch with engage()
-        activeMode.active()();
+        activeMode.active()(channel);
         
 
         expect(device.button.play.touch, toggle(channel, 'play'));
