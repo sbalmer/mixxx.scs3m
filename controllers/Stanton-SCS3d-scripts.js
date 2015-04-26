@@ -448,8 +448,9 @@ StantonSCS3d.Agent = function(device) {
         }
     }
     
-    function fxpatch() {
+    function fxpatch(channel) {
         tell(device.mode.fx.light.red);
+        // Dunno what to do here
     }
 
     function eqpatch(channel) {
