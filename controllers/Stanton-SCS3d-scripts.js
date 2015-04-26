@@ -297,7 +297,7 @@ StantonSCS3d.Agent = function(device) {
         return function(value) {
             tell(translator(value));
         }
-    }  
+    }
     
     function patchleds(translator) {
         return function(value) {
@@ -489,13 +489,21 @@ StantonSCS3d.Agent = function(device) {
         watch(channel, 'beat_active', binarylight(device.button.tap.light.black, device.button.tap.light.red));
         
         tell(device.modeset.circle);
-        watch(channel, 'playposition', patchleds(function(position) { 
+        watch(channel, 'playposition', patchleds(function(position) {
+            // Duration is not rate-corrected
             var duration = engine.getValue(channel, 'duration');
+
+            // Which means the seconds we get are not rate-corrected either.
+            // They tick faster for higher rates.
             var seconds = duration * position;
-            var revolutions = seconds / 1.8; // 33.3rpm
-            var offset = revolutions % 1; // Fractional part is the light's position in the circle
-            var clockwise_offset = 1 - offset;
-            return device.slider.circle.meter.needle(clockwise_offset);
+
+            // 33⅓rpm = 100 / 3 / 60 rounds/second = 1.8 seconds/round
+            var rounds = seconds / 1.8;
+            
+            // Fractional part is needle's position in the circle
+            var needle = rounds % 1;
+
+            return device.slider.circle.meter.needle(1 - needle); // reverse for clockwise
         }));
 
         // Read deck state from unrelated control which may be set by the 3m
