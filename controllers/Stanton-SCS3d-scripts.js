@@ -115,7 +115,7 @@ StantonSCS3d.Device = function(channel) {
         slider.light = Light(meterid-2);
         return slider;
     }
-        
+
     function Touch(id) {
         return {
             light: Light(id),
@@ -123,11 +123,23 @@ StantonSCS3d.Device = function(channel) {
             release: [NoteOff, id]
         }
     }
-        
-    function Field(id) {
+
+
+    // Stanton changed the mapping of the fields in button mode in newer devices.
+    // Originally, in button mode, the right and left column held 4 "buttons"
+    // each. Hitting one of those without accidentally touching another requires 
+    // very accurate motor control beyond the capabilities of a DJ (even when 
+    // sober). Later versions of the device send only two buttons per column
+    // (top/bottom), these are easy to hit.
+    //
+    // So not only do we need two id to map to the same field, we want to control
+    // multiple lights for this control as well. This is why we're using the plural 
+    // here. The respective functions expect() and tell() know about this.
+    function Field(ids, lightids) {
         return {
-            touch: [NoteOn, id],
-            release: [NoteOff, id]
+            touch: [NoteOn, ids],
+            release: [NoteOff, ids],
+            light: Light(lightids)
         }
     }
 
@@ -165,8 +177,11 @@ StantonSCS3d.Device = function(channel) {
             right: Slider(0x0E, 0x4F, 7)
         },
         field: [
-            Touch([0x48, 0x4A]),
-            Touch([0x48, 0x4A]),
+            Touch([0x48, 0x4A], [0x61, 0x62]),
+            Touch([0x4C, 0x4E], [0x5F, 0x60]),
+            Touch([0x4F, 0x51], [0x67, 0x68]),
+            Touch([0x53, 0x45], [0x69, 0x6A]),
+            Touch(0x01, [0x64, 0x65, 0x5D, 0x6C])
         ],
         bottom: {
             left: Touch(0x30),
@@ -217,6 +232,16 @@ StantonSCS3d.Agent = function(device) {
     }
     
     function expect(control, handler) {
+        if (control[1].length) {
+            // Some weird controls need to watch over two ID, in this case the
+            // control is actually a list of two control ID
+            var i = 0;
+            for (; i < control[1].length; i++) {
+                expect([control[0], control[1][i]], handler);
+            }
+            return;
+        }
+
         var address = (control[0] << 8) + control[1];
         receivers[address] = handler;
     }
@@ -275,6 +300,16 @@ StantonSCS3d.Agent = function(device) {
         if (message.length > 3) {
             midi.sendSysexMsg(message, message.length);
             return true;
+        }
+        
+        if (message[1].length) {
+            // When multiple controller ID are present, send the message to each
+            var i = 0;
+            var changed = false;
+            for (; i < message[1].length; i++) {
+                changed = changed || tell([message[0], message[1][i], message[2]], force);
+            }
+            return changed;
         }
 
         var address = (message[0] << 8) + message[1];
@@ -389,13 +424,17 @@ StantonSCS3d.Agent = function(device) {
     
     function Multiswitch(preset) {
         var engaged = preset;
-        function change(state) {
-            var prev = engaged;
-            engaged = state;
-            return engaged !== prev;
-        }
         return {
-            'engage': function(pos) { return function() { return change(pos); } },
+            'cycle': function(pos) { return function() {
+                var last = pos.indexOf(engaged);
+                var next = 0;
+                if (last !== -1) {
+                    var next = (last + 1) % pos.length;
+                }
+                var prev = engaged;
+                engaged = pos[next];
+                return engaged !== prev;
+            }},
             'engaged': function(pos) { return engaged === pos },
             'active': function() { return engaged; },
             'choose': function(pos, off, on) { return (engaged === pos) ? on : off; }
@@ -469,9 +508,27 @@ StantonSCS3d.Agent = function(device) {
         tell(device.mode.loop.light.red);
     }
 
-    function trigpatch() {
-        tell(device.mode.trig.light.red);
+    function Trigpatch(trigset) {
+        return function(channel) {
+            tell(device.modeset.button);
+            tell(device.mode.trig.light.bits(trigset+1));
+
+            var i = 0;
+            var offset = trigset * 5;
+            for (; i < 5; i++) {
+                var hotcue = offset + i + 1;
+                expect(device.field[i].touch, setConst(channel, 'hotcue_'+hotcue+'_activate', true));
+                watch(channel, 'hotcue_'+hotcue+'_activate', binarylight(device.field[i].light.black, device.field[i].light.blue));
+                watch(channel, 'hotcue_'+hotcue+'_activate', function(value) { print(value); });
+            }
+        }
     }
+
+    var trigpatches = [
+        Trigpatch(0),
+        Trigpatch(1),
+        Trigpatch(2)
+    ];
 
     function vinylpatch() {
         tell(device.mode.vinyl.light.red);
@@ -511,11 +568,11 @@ StantonSCS3d.Agent = function(device) {
         tell(device.mode.loop.light.black);
         tell(device.mode.trig.light.black);
         tell(device.mode.vinyl.light.black);
-        expect(device.mode.fx.touch, repatch(activeMode.engage(fxpatch)));
-        expect(device.mode.eq.touch, repatch(activeMode.engage(eqpatch)));
-        expect(device.mode.loop.touch, repatch(activeMode.engage(looppatch)));
-        expect(device.mode.trig.touch, repatch(activeMode.engage(trigpatch)));
-        expect(device.mode.vinyl.touch, repatch(activeMode.engage(vinylpatch)));
+        expect(device.mode.fx.touch, repatch(activeMode.cycle([fxpatch])));
+        expect(device.mode.eq.touch, repatch(activeMode.cycle([eqpatch])));
+        expect(device.mode.loop.touch, repatch(activeMode.cycle([looppatch])));
+        expect(device.mode.trig.touch, repatch(activeMode.cycle(trigpatches)));
+        expect(device.mode.vinyl.touch, repatch(activeMode.cycle([vinylpatch])));
         expect(device.mode.deck.touch, repatch(side.toggle));
         
         // Call the patch function that was put into the switch with engage()
@@ -534,8 +591,7 @@ StantonSCS3d.Agent = function(device) {
         
         expect(device.button.tap.touch, function() { bpm.tapButton(channelno); });
         watch(channel, 'beat_active', binarylight(device.button.tap.light.black, device.button.tap.light.red));
-        
-        tell(device.modeset.circle);
+
         watch(channel, 'playposition', patchleds(function(position) {
             // Duration is not rate-corrected
             var duration = engine.getValue(channel, 'duration');
@@ -560,7 +616,7 @@ StantonSCS3d.Agent = function(device) {
         // This may fail at any future or past version of Mixxx and you have only me to blame for it.
         watch('[PreviewDeck1]', 'quantize', repatch(gleanChannel));
     }
-    
+
     return {
         start: function() {
             tell(device.modeset.flat);
