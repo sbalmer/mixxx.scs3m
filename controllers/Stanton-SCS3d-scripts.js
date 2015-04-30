@@ -341,22 +341,6 @@ StantonSCS3d.Agent = function(device) {
                 if (msgs.hasOwnProperty(i)) tell(msgs[i]);
             }
         }
-    }    
-    
-    // Cut off at 0.01 because it drops off very slowly
-    function vupatch(translator) {
-        return function(value) {
-            value = value * 1.01 - 0.01;
-            tell(translator(value));
-        }
-    }
-    
-    // accelerate away from 0.5 so that small changes become visible faster
-    function offcenter(translator) {
-        return function(value) {
-            // If you want to adjust it, fiddle with the exponent (second argument to pow())
-            return translator(Math.pow(Math.abs(value - 0.5) * 2, 0.6) / (value < 0.5 ? -2 : 2) + 0.5)
-        }
     }
     
     function binarylight(off, on) {
