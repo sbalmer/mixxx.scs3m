@@ -501,9 +501,9 @@ StantonSCS3d.Agent = function(device) {
             var offset = trigset * 5;
             for (; i < 5; i++) {
                 var hotcue = offset + i + 1;
-                expect(device.field[i].touch, setConst(channel, 'hotcue_'+hotcue+'_activate', true));
-                watch(channel, 'hotcue_'+hotcue+'_activate', binarylight(device.field[i].light.black, device.field[i].light.blue));
-                watch(channel, 'hotcue_'+hotcue+'_activate', function(value) { print(value); });
+                var field = device.field[i];
+                expect(field.touch, setConst(channel, 'hotcue_'+hotcue+'_activate', true));
+                watch(channel, 'hotcue_'+hotcue+'_activate', binarylight(field.light.black, field.light.blue));
             }
         }
     }
