@@ -198,6 +198,17 @@ StantonSCS3d.Device = function(channel) {
 
 
 StantonSCS3d.Agent = function(device) {
+    
+    // debugging helper
+    function printmess(message) {
+        var i;
+        var s = '';
+        for (i in message) {
+            s = s + ('0' + message[i].toString(16)).slice(-2)
+        }
+        print("Midi "+s);
+    }
+    
     // Cache last sent bytes to avoid sending duplicates.
     // The second byte of each message (controller id) is used as key to hold
     // the last sent message for each controller.
