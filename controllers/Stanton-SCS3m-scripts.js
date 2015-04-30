@@ -16,11 +16,9 @@ StantonSCS3m.init = function(id) {
     this.device = this.Device();
     this.agent = this.Agent(this.device);
     this.agent.start();
-    this.timer = engine.beginTimer(20, this.agent.tick);
 }
 
 StantonSCS3m.shutdown = function() {
-    if (StantonSCS3m.timer) engine.stopTimer(StantonSCS3m.timer);
     StantonSCS3m.agent.stop();
 }
 
@@ -195,7 +193,7 @@ StantonSCS3m.Agent = function(device) {
     // This is necessary because some messages must be sent with delay lest
     // the device becomes confused
     var loading = true;
-    var throttling = true;
+    var throttling = false;
     var slow = [];
     var slowterm = [];
     var pipe = [];
@@ -302,7 +300,7 @@ StantonSCS3m.Agent = function(device) {
     // They are put into the slow queue
     function tellslowly(messages) {
         slow.push(messages);
-        throttling = true;
+        throttle();
     }
     
     function tick() {
@@ -350,7 +348,10 @@ StantonSCS3m.Agent = function(device) {
         }
 
         // Open the pipe
-        throttling = false;
+        if (throttling) {
+            engine.stopTimer(throttling);
+            throttling = false;
+        }   
         loading = false;
     }
     
@@ -446,7 +447,7 @@ StantonSCS3m.Agent = function(device) {
     
     function repatch(handler) {
         return function(value) {
-            throttling = true;
+            throttle();
             handler(value);
             clear();
             patchage();
@@ -602,13 +603,19 @@ StantonSCS3m.Agent = function(device) {
         }
     }
     
+    function throttle() {
+        if (!throttling) {
+            throttling = engine.beginTimer(20, tick);
+        }
+    }
+    
     return {
         start: function() {
             loading = true;
+            throttle();
             tellslowly([device.flat]);
             patchage();
         },
-        tick: tick,
         receive: receive,
         stop: function() {
             clear();
