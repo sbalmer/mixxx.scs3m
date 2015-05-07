@@ -116,9 +116,10 @@ StantonSCS3d.Device = function(channel) {
         return slider;
     }
 
-    function Touch(id) {
+    function Touch(id, lightid) {
+        if (!lightid) lightid = id;
         return {
-            light: Light(id),
+            light: Light(lightid),
             touch: [NoteOn, id],
             release: [NoteOff, id]
         }
@@ -199,15 +200,41 @@ StantonSCS3d.Device = function(channel) {
 
 StantonSCS3d.Agent = function(device) {
     
+    // Multiple controller ID may be specified in the MIDI messages used
+    // internally. The output functions will demux and run the same action on
+    // both messages.
+    //
+    // demux(function(message) { print message; })(['hello', ['me', 'you']])
+    // -> hello,me
+    // -> hello,you
+    function demux(action) {
+        return function(message, nd) {
+            var changed = false;
+            if (message[1]) {
+                if (message[1].length) {
+                    var i;
+                    for (i in message[1]) {
+                        var demuxd = [message[0], message[1][i], message[2]];
+                        changed = action(demuxd, nd) || changed;
+                    }
+                } else {
+                    changed = action(message, nd);
+                }
+            }
+            return changed;
+        }
+    }
+    
     // debugging helper
-    function printmess(message) {
+    var printmess = demux(function(message) {
         var i;
         var s = '';
+
         for (i in message) {
             s = s + ('0' + message[i].toString(16)).slice(-2)
         }
         print("Midi "+s);
-    }
+    });
     
     // Cache last sent bytes to avoid sending duplicates.
     // The second byte of each message (controller id) is used as key to hold
@@ -243,18 +270,10 @@ StantonSCS3d.Agent = function(device) {
     }
     
     function expect(control, handler) {
-        if (control[1].length) {
-            // Some weird controls need to watch over two ID, in this case the
-            // control is actually a list of two control ID
-            var i = 0;
-            for (; i < control[1].length; i++) {
-                expect([control[0], control[1][i]], handler);
-            }
-            return;
-        }
-
-        var address = (control[0] << 8) + control[1];
-        receivers[address] = handler;
+        demux(function(control) {
+            var address = (control[0] << 8) + control[1];
+            receivers[address] = handler;
+        })(control);
     }
     
     function watch(channel, control, handler) {
@@ -307,20 +326,10 @@ StantonSCS3d.Agent = function(device) {
     // Param force: send value regardless of last recorded state
     // Returns whether the massage was sent
     // False is returned if the mesage was sent before.
-    function tell(message, force) {
+    var tell = demux(function(message, force) {
         if (message.length > 3) {
             midi.sendSysexMsg(message, message.length);
             return true;
-        }
-        
-        if (message[1].length) {
-            // When multiple controller ID are present, send the message to each
-            var i = 0;
-            var changed = false;
-            for (; i < message[1].length; i++) {
-                changed = changed || tell([message[0], message[1][i], message[2]], force);
-            }
-            return changed;
         }
 
         var address = (message[0] << 8) + message[1];
@@ -334,7 +343,7 @@ StantonSCS3d.Agent = function(device) {
         last[address] = message[2];
 
         return true;
-    }
+    });
     
     
     // Map engine values in the range [0..1] to lights
@@ -514,7 +523,7 @@ StantonSCS3d.Agent = function(device) {
                 var hotcue = offset + i + 1;
                 var field = device.field[i];
                 expect(field.touch, setConst(channel, 'hotcue_'+hotcue+'_activate', true));
-                watch(channel, 'hotcue_'+hotcue+'_activate', binarylight(field.light.black, field.light.blue));
+                watch(channel, 'hotcue_'+hotcue+'_enabled', binarylight(field.light.black, field.light.red));
             }
         }
     }
