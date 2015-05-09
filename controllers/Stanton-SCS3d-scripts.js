@@ -41,9 +41,9 @@ StantonSCS3d.Device = function(channel) {
     
     function Meter(id, lights) {
         var ctrl = [];
-        var i = 1;
-        for (; i <= lights; i++) {
-            ctrl[i] = [NoteOn, id+lights-i];
+        var i = 0;
+        for (; i < lights; i++) {
+            ctrl[i] = [NoteOn, id+lights-i-1];
         }
         return ctrl;
     }
@@ -155,6 +155,18 @@ StantonSCS3d.Device = function(channel) {
     }
 }
 
+// debugging helper
+var printmess = function(message) {
+    var i;
+    var s = '';
+
+    for (i in message) {
+        s = s + ('0' + message[i].toString(16)).slice(-2)
+    }
+    print("Midi "+s);
+};
+
+
 
 StantonSCS3d.Comm = function() {
     // Build a control identifier (CID) from the first two message bytes.
@@ -190,7 +202,7 @@ StantonSCS3d.Comm = function() {
     function send() {
         for (cid in Object.keys(dirty)) {
             var message = base[cid];
-            if (!message) return; // As long as no base is set, don't send anything
+            if (!message) continue; // As long as no base is set, don't send anything
             
             var lastMessage = actual[cid];
             if (message.length > 3) {
@@ -237,8 +249,10 @@ StantonSCS3d.Comm = function() {
         
         unmask: function(message) {
             var cid = CID(message);
-            delete mask[cid];
-            dirty[cid] = true;
+            if (mask[cid]) {
+                delete mask[cid];
+                dirty[cid] = true;
+            }
         },
     
         tick: function() {
@@ -262,11 +276,12 @@ StantonSCS3d.Comm = function() {
         expect: function(message, handler) {
             var cid = CID(message);
             receivers[cid] = handler;
-        }
+        },
         
         receive: function(type, control, value) {
             var cid = CID([type, control]);
-            if (handler = receivers[cid]) {
+            var handler = receivers[cid];
+            if (handler) {
                 handler(value);
                 send();
             }
@@ -381,19 +396,13 @@ StantonSCS3d.Agent = function(device) {
             })();
         }
     }
-    
-    
+
     // Send MIDI message to device
     // Param message: list of three MIDI bytes
     // Param force: send value regardless of last recorded state
     var tell = demux(function(message, force) {
         comm.base(message, force);
     });
-    
-    var blink = {
-        quick: function(value, ticks) { return (value + ticks) % 2; }
-        normal: function(value, ticks) { return Math.floor(value + ticks / 10) % 2; }
-    }
 
     // Map engine values in the range [0..1] to lights
     // translator maps from [0..1] to a midi message (three bytes)
@@ -457,7 +466,7 @@ StantonSCS3d.Agent = function(device) {
         return function(value) {
             var pos = Math.max(0, Math.min(range, Math.round(value * range))) - 1; // Zero-based index, -1 means no light
             var i = 0;
-            for (; i < cnt; i++) {
+            for (; i < range; i++) {
                 var light = lights[i];
                 tell([light[0], light[1], i >= pos]);
             }
@@ -539,7 +548,7 @@ StantonSCS3d.Agent = function(device) {
             'choose': function(pos, off, on) { return (engaged === pos) ? on : off; }
         }
     }
-    
+
     // mode for each channel
     var mode = {
         1: Multiswitch(vinylpatch),
@@ -660,6 +669,7 @@ StantonSCS3d.Agent = function(device) {
         tell(device.logo.on);
 
         expect(device.gain.slide.abs, set(channel, 'volume'));
+
         watch(channel, 'volume', Bar(device.gain.meter));
 
         var activeMode = mode[channelno];
@@ -677,7 +687,6 @@ StantonSCS3d.Agent = function(device) {
         
         // Call the patch function that was put into the switch with engage()
         activeMode.active()(channel);
-        
 
         expect(device.button.play.touch, toggle(channel, 'play'));
         watch(channel, 'play', binarylight(device.button.play.light.black, device.button.play.light.red));
@@ -706,13 +715,23 @@ StantonSCS3d.Agent = function(device) {
             // Fractional part is needle's position in the circle
             var needle = rounds % 1;
 
+            var left = duration - seconds;
+            var warnDuration = 30; // Seconds
+            
             var lights = device.slider.circle.meter;
             var count = lights.length;
             var pos = Math.floor(needle * count); // Zero-based index
+            var warnPos = (left < warnDuration) && pos + Math.floor(left / warnDuration * count);
             var i = 0;
             for (; i < count; i++) {
-                if (i == pos) {
-                    comm.mask(lights[i], function(value) { return !value; });
+                if (i === pos) {
+                    comm.mask(lights[i], function(value) { return !value; }); // Invert
+                } else if (i === warnPos) {
+                    // Add a blinking light that runs a tad slower so the
+                    // needle light will reach it after warnDuration
+                    if (needle % 0.05 > 0.025) { // Blink 20 times per revolution
+                        comm.mask(lights[i], function(value) { return !value; }); // Invert
+                    }
                 } else {
                     comm.unmask(lights[i]);
                 }
@@ -722,11 +741,11 @@ StantonSCS3d.Agent = function(device) {
         // Read deck state from unrelated control which may be set by the 3m
         // Among all the things WRONG about this, two stand out:
         // 1. The control is not meant to transmit this information.
-        // 2. A value > 1 is expected from a control which is just a toggle (suggestin ga binary value)
+        // 2. A value > 1 is expected from a control which is just a toggle (suggesting a binary value)
         // This may fail at any future or past version of Mixxx and you have only me to blame for it.
         watch('[PreviewDeck1]', 'quantize', repatch(gleanChannel));
     }
-    
+
     var timer = false;
 
     return {
@@ -735,7 +754,7 @@ StantonSCS3d.Agent = function(device) {
             patchage();
             if (!timer) timer = engine.beginTimer(100, comm.tick);
         },
-        receive: receive,
+        receive: comm.receive,
         stop: function() {
             if (timer) engine.stopTimer(timer);
             clear();
