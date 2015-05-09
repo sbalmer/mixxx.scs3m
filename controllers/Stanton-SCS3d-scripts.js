@@ -40,56 +40,14 @@ StantonSCS3d.Device = function(channel) {
     }
     
     function Meter(id, lights) {
-        // Returns messages that light or extinguish the individual LED
-        // of the meter. sel() is called for each light [1..lights]
-        // and must return a boolean 
-        function bitlights(sel) {
-            var msgs = new Array(lights);
-            
-            // The meter lights are enumerated top-bottom
-            // The sel() function gets lowest led = 1, top led = lights
-            var i = 0;
-            for (; i < lights; i++) {
-                msgs[i] = [NoteOn, id+i, +sel(lights-i)];
-            }
-            return msgs;
+        var ctrl = [];
+        var i = 1;
+        for (; i <= lights; i++) {
+            ctrl[i] = [NoteOn, id+lights-i];
         }
-        function plain(value) {
-            if (value <= 0.0) return 1;
-            if (value >= 1.0) return lights;
-            return Math.ceil(value * lights);
-        }
-        function clamped(value) {
-            if (value <= 0.0) return 1;
-            if (value >= 1.0) return lights;
-            return Math.round(value * (lights - 2) + 1.5);
-        }
-        function zeroclamped(value) {
-            if (value <= 0.0) return 0;
-            if (value >= 1.0) return lights;
-            return Math.round(value * (lights - 1) + 0.5);
-        }
-        return {
-            needle: function(value) {
-                var light = plain(value);
-                return bitlights(function(bit) { return light == bit; });
-            },
-            centerbar: function(value) {
-                var center = (lights - 1) / 2 + 1;
-                var extreme = clamped(value);
-                return bitlights(function(bit) { 
-                    return (bit >= extreme && bit <= center) || (bit <= extreme && bit >= center);
-                });
-            },
-            bar: function(value) {
-                var extreme = zeroclamped(value);
-                return bitlights(function(bit) { 
-                    return bit <= extreme;
-                });
-            }
-        }
+        return ctrl;
     }
-        
+
     function Light(id) {
         return {
             bits: function(bits) { return [NoteOn, id, bits]; },
@@ -198,6 +156,125 @@ StantonSCS3d.Device = function(channel) {
 }
 
 
+StantonSCS3d.Comm = function() {
+    // Build a control identifier (CID) from the first two message bytes.
+    function CID(message) {
+        return (message[0] << 8) + message[1];
+    }
+
+    // Static state of the LED, indexed by CID
+    // This keeps the desired state before modifiers, so that adding
+    // or removing modifiers is possible without knowing the base state.
+    var base = {};
+    
+    // Modifier functions over base, indexed by CID
+    // The functions receive the last byte of the message and return the
+    // modified value. They don't 
+    var mask = {};
+    
+    // List of masks that depend on time
+    var ticking = {};
+    
+    // CID that may need updating
+    var dirty = {};
+    
+    // Last sent messages, indexed by CID
+    var actual = {};
+    
+    // Tick counter
+    var ticks = 0;
+    
+    // Handler functions indexed by CID
+    receivers = {};
+    
+    function send() {
+        for (cid in Object.keys(dirty)) {
+            var message = base[cid];
+            if (!message) return; // As long as no base is set, don't send anything
+            
+            var lastMessage = actual[cid];
+            if (message.length > 3) {
+                // Sysex messages are expected to be modesetting messages
+                // They are expected to differ in the second last byte
+                if (
+                    !lastMessage 
+                 || lastMessage.length != message.length
+                 || lastMessage[message.length-2] != message[message.length-2]
+                ) {
+                    midi.sendSysexMsg(message, message.length);
+                    actual[cid] = message;
+                }
+            } else {
+                var value = message[2];
+                if (mask[cid]) value = mask[cid](value, ticks); 
+                if (lastMessage[cid][2] != value) {
+                    midi.sendShortMsg(message[0], message[1], value);
+                    actual[cid] = message;
+                }
+            }
+        }
+        dirty = {};
+    }
+    
+    return {
+        base: function(message, force) {
+            var cid = CID(message);
+
+            base[cid] = message;
+            dirty[cid] = true;
+
+            if (force) {
+                delete actual[cid];
+            }
+        },
+    
+        mask: function(message, mod, changes) {
+            var cid = CID(message);
+
+            mask[cid] = mod;
+            dirty[cid] = true;
+        },
+        
+        unmask: function(message) {
+            var cid = CID(message);
+            delete mask[cid];
+            dirty[cid] = true;
+        },
+    
+        tick: function() {
+            for (cid in Object.keys(ticking)) {
+                dirty[cid] = true;
+            }
+            send();
+            ticks += 1;
+        },
+        
+        clear: function() {
+            receivers = {};
+            ticking = {};
+            for (cid in Object.keys(mask)) {
+                dirty[cid] = true;
+            }
+            mask = {};
+            // base and actual are not cleared
+        },
+        
+        expect: function(message, handler) {
+            var cid = CID(message);
+            receivers[cid] = handler;
+        }
+        
+        receive: function(type, control, value) {
+            var cid = CID([type, control]);
+            if (handler = receivers[cid]) {
+                handler(value);
+                send();
+            }
+        }
+    };
+}
+
+
 StantonSCS3d.Agent = function(device) {
     
     // Multiple controller ID may be specified in the MIDI messages used
@@ -236,19 +313,13 @@ StantonSCS3d.Agent = function(device) {
         print("Midi "+s);
     });
     
-    // Cache last sent bytes to avoid sending duplicates.
-    // The second byte of each message (controller id) is used as key to hold
-    // the last sent message for each controller.
-    var last = {};
-    
-    // Handlers for received messages
-    var receivers = {};
+    var comm = StantonSCS3d.Comm();
     
     // Connected engine controls
     var watched = {};
     
     function clear() {
-        receivers = {};
+        comm.clear();
 
         // I'd like to disconnect everything on clear, but that doesn't work when using closure callbacks, I guess I'd have to pass the callback function as string name
         // I'd have to invent function names for all handlers
@@ -259,20 +330,11 @@ StantonSCS3d.Agent = function(device) {
             }
         }
     }
-    
-    function receive(type, control, value) {
-        var address = (type << 8) + control;
 
-        if (handler = receivers[address]) {
-            handler(value);
-            return;
-        }
-    }
     
     function expect(control, handler) {
         demux(function(control) {
-            var address = (control[0] << 8) + control[1];
-            receivers[address] = handler;
+            comm.expect(control, handler);
         })(control);
     }
     
@@ -324,28 +386,15 @@ StantonSCS3d.Agent = function(device) {
     // Send MIDI message to device
     // Param message: list of three MIDI bytes
     // Param force: send value regardless of last recorded state
-    // Returns whether the massage was sent
-    // False is returned if the mesage was sent before.
     var tell = demux(function(message, force) {
-        if (message.length > 3) {
-            midi.sendSysexMsg(message, message.length);
-            return true;
-        }
-
-        var address = (message[0] << 8) + message[1];
-
-        if (!force && last[address] === message[2]) {
-            return false; // Not repeating same message
-        }
-
-        midi.sendShortMsg(message[0], message[1], message[2]);
-
-        last[address] = message[2];
-
-        return true;
+        comm.base(message, force);
     });
     
-    
+    var blink = {
+        quick: function(value, ticks) { return (value + ticks) % 2; }
+        normal: function(value, ticks) { return Math.floor(value + ticks / 10) % 2; }
+    }
+
     // Map engine values in the range [0..1] to lights
     // translator maps from [0..1] to a midi message (three bytes)
     function patch(translator) {
@@ -354,6 +403,7 @@ StantonSCS3d.Agent = function(device) {
         }
     }
     
+    // Patch multiple
     function patchleds(translator) {
         return function(value) {
             var msgs = translator(value);
@@ -366,6 +416,51 @@ StantonSCS3d.Agent = function(device) {
     function binarylight(off, on) {
         return function(value) {
             tell(value ? on : off);
+        }
+    }
+    
+    // Return a handler that lights one LED depending on value
+    function Needle(lights) {
+        var range = lights.length - 1;
+        return function(value) {
+            // Where's the needle?
+            // On the first light for zero values, on the last for one.
+            var pos = Math.max(0, Math.min(range, Math.round(value * range)));
+            var i = 0;
+            for (; i <= range; i++) {
+                var light = lights[i];
+                tell([light[0], light[1], i == pos]);
+            }
+        }
+    }
+    
+    // Return a handler that lights LED from the center of the meter
+    function Centerbar(lights) {
+        var range = lights.length - 1;
+        var center = Math.round(lights.length / 2) - 1; // Zero-based
+        return function(value) {
+            var pos = Math.max(0, Math.min(range, Math.round(value * range)));
+            var left = Math.min(center, pos);
+            var right = Math.max(center, pos);
+            var i = 0;
+            for (; i < cnt; i++) {
+                var light = lights[i];
+                tell([light[0], light[1], i >= left && i <= right]);
+            }
+        }
+    }
+    
+    // Return a handler that lights LED from the bottom of the meter
+    // For zero values no light is turned on
+    function Bar(lights) {
+        var range = lights.length;
+        return function(value) {
+            var pos = Math.max(0, Math.min(range, Math.round(value * range))) - 1; // Zero-based index, -1 means no light
+            var i = 0;
+            for (; i < cnt; i++) {
+                var light = lights[i];
+                tell([light[0], light[1], i >= pos]);
+            }
         }
     }
 
@@ -487,6 +582,7 @@ StantonSCS3d.Agent = function(device) {
             if (changed) {
                 clear();
                 patchage();
+                print("repatched "+Object.keys(receivers).length+" receivers and watching "+Object.keys(watched).length+" controls");
             }
         }
     }
@@ -499,9 +595,9 @@ StantonSCS3d.Agent = function(device) {
     function eqpatch(channel) {
         tell(device.modeset.slider);
         tell(device.mode.eq.light.red);
-        watch(channel, 'filterLow', patchleds(device.slider.left.meter.centerbar)); 
-        watch(channel, 'filterMid', patchleds(device.slider.middle.meter.centerbar)); 
-        watch(channel, 'filterHigh', patchleds(device.slider.right.meter.centerbar));
+        watch(channel, 'filterLow', Centerbar(device.slider.left.meter)); 
+        watch(channel, 'filterMid', Centerbar(device.slider.middle.meter)); 
+        watch(channel, 'filterHigh', Centerbar(device.slider.right.meter));
         
         expect(device.slider.left.slide.abs, set(channel, 'filterLow'));
         expect(device.slider.middle.slide.abs, set(channel, 'filterMid'));
@@ -564,7 +660,7 @@ StantonSCS3d.Agent = function(device) {
         tell(device.logo.on);
 
         expect(device.gain.slide.abs, set(channel, 'volume'));
-        watch(channel, 'volume', patchleds(device.gain.meter.bar));
+        watch(channel, 'volume', Bar(device.gain.meter));
 
         var activeMode = mode[channelno];
         tell(device.mode.fx.light.black);
@@ -596,7 +692,7 @@ StantonSCS3d.Agent = function(device) {
         expect(device.button.tap.touch, function() { bpm.tapButton(channelno); });
         watch(channel, 'beat_active', binarylight(device.button.tap.light.black, device.button.tap.light.red));
 
-        watch(channel, 'playposition', patchleds(function(position) {
+        watch(channel, 'playposition', function(position) {
             // Duration is not rate-corrected
             var duration = engine.getValue(channel, 'duration');
 
@@ -610,24 +706,38 @@ StantonSCS3d.Agent = function(device) {
             // Fractional part is needle's position in the circle
             var needle = rounds % 1;
 
-            return device.slider.circle.meter.needle(1 - needle); // reverse for clockwise
-        }));
+            var lights = device.slider.circle.meter;
+            var count = lights.length;
+            var pos = Math.floor(needle * count); // Zero-based index
+            var i = 0;
+            for (; i < count; i++) {
+                if (i == pos) {
+                    comm.mask(lights[i], function(value) { return !value; });
+                } else {
+                    comm.unmask(lights[i]);
+                }
+            }
+        });
 
         // Read deck state from unrelated control which may be set by the 3m
         // Among all the things WRONG about this, two stand out:
         // 1. The control is not meant to transmit this information.
-        // 2. A value > 1 is expected from a control which is just a toggle (suggesting a binary value)
+        // 2. A value > 1 is expected from a control which is just a toggle (suggestin ga binary value)
         // This may fail at any future or past version of Mixxx and you have only me to blame for it.
         watch('[PreviewDeck1]', 'quantize', repatch(gleanChannel));
     }
+    
+    var timer = false;
 
     return {
         start: function() {
             tell(device.modeset.flat);
             patchage();
+            if (!timer) timer = engine.beginTimer(100, comm.tick);
         },
         receive: receive,
         stop: function() {
+            if (timer) engine.stopTimer(timer);
             clear();
             tell(device.lightsoff);
             send(device.logo.on, true);
