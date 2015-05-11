@@ -720,13 +720,12 @@ StantonSCS3d.Agent = function(device) {
 
             // Add a warning indicator for the last seconds of a song
             var left = duration - seconds;
-            var warnDuration = 30; // Seconds
+            var warnDuration = 30; // Seconds FIXME not rate-corrected.
             var warnPos = false;
             if (left < warnDuration) {
                 // Add a blinking light that runs a tad slower so the needle
                 // will reach it when the time runs out
                 var warnLight = (rounds + (left / warnDuration)) % 1;
-                print(warnLight)
                 warnPos = count - Math.floor(warnLight * count) - 1;
             }
 
