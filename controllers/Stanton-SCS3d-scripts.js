@@ -157,14 +157,14 @@ StantonSCS3d.Device = function(channel) {
 }
 
 // debugging helper
-var printmess = function(message) {
+var printmess = function(message, text) {
     var i;
     var s = '';
 
     for (i in message) {
         s = s + ('0' + message[i].toString(16)).slice(-2)
     }
-    print("Midi "+s);
+    print("Midi "+s+(text?' '+text:''));
 };
 
 
@@ -205,24 +205,26 @@ StantonSCS3d.Comm = function() {
             var message = base[cid];
             if (!message) continue; // As long as no base is set, don't send anything
             
-            var lastMessage = actual[cid];
+            var last = actual[cid];
             if (message.length > 3) {
                 // Sysex messages are expected to be modesetting messages
                 // They are expected to differ in the second last byte
                 if (
-                    !lastMessage 
-                 || lastMessage.length != message.length
-                 || lastMessage[message.length-2] != message[message.length-2]
+                    last
+                 || last != message[message.length-2]
                 ) {
                     midi.sendSysexMsg(message, message.length);
-                    actual[cid] = message;
+                    actual[cid] = message[message.length-2];
                 }
             } else {
                 var value = message[2];
-                if (mask[cid]) value = mask[cid](value, ticks);
-                if (!lastMessage || lastMessage[2] != value) {
+                if (mask[cid]) {
+                    value = mask[cid](value, ticks);
+                } else {
+                }
+                if (last === undefined || last != value) {
                     midi.sendShortMsg(message[0], message[1], value);
-                    actual[cid] = message;
+                    actual[cid] = value;
                 }
             }
         }
@@ -256,7 +258,7 @@ StantonSCS3d.Comm = function() {
         },
     
         tick: function() {
-            for (cid in Object.keys(ticking)) {
+            for (cid in ticking) {
                 dirty[cid] = true;
             }
             send();
@@ -266,7 +268,7 @@ StantonSCS3d.Comm = function() {
         clear: function() {
             receivers = {};
             ticking = {};
-            for (cid in Object.keys(mask)) {
+            for (cid in mask) {
                 dirty[cid] = true;
             }
             mask = {};
@@ -432,14 +434,15 @@ StantonSCS3d.Agent = function(device) {
     
     // Return a handler that lights LED from the center of the meter
     function Centerbar(lights) {
-        var range = lights.length - 1;
-        var center = Math.round(lights.length / 2) - 1; // Zero-based
+        var count = lights.length;
+        var range = count - 1;
+        var center = Math.round(count / 2) - 1; // Zero-based
         return function(value) {
             var pos = Math.max(0, Math.min(range, Math.round(value * range)));
             var left = Math.min(center, pos);
             var right = Math.max(center, pos);
             var i = 0;
-            for (; i < cnt; i++) {
+            for (; i < count; i++) {
                 var light = lights[i];
                 tell([light[0], light[1], i >= left && i <= right]);
             }
@@ -717,7 +720,7 @@ StantonSCS3d.Agent = function(device) {
             
             var lights = device.slider.circle.meter;
             var count = lights.length;
-            var pos = Math.floor(needle * count); // Zero-based index
+            var pos = count - Math.floor(needle * count); // Zero-based index
             var warnPos = (left < warnDuration) && pos + Math.floor(left / warnDuration * count);
             var i = 0;
             for (; i < count; i++) {
