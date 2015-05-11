@@ -330,6 +330,8 @@ StantonSCS3d.Comm = function() {
 }
 
 
+// Create a function that sets the rate of each channel by the timing between
+// calls
 StantonSCS3d.Syncopath = function() {
     // Lists of last ten taps, per deck, in epoch milliseconds
     var deckTaps = {};
@@ -340,14 +342,19 @@ StantonSCS3d.Syncopath = function() {
 
         var last = taps[0] || 0;
         var delta = now - last;
-        taps.unshift(now);
-        taps = taps.slice(0, 8); // Keep eight
-        deckTaps[channel] = taps;
-        
-        // Don't set rate when the taps are stale or we don't have enough taps
-        if (delta > 2000 || taps.length < 3) {
+
+        // Reset when taps are stale
+        if (delta > 2000) {
+            deckTaps[channel] = [now];
             return;
         }
+        
+        taps.unshift(now);
+        taps = taps.slice(0, 8); // Keep last eight
+        deckTaps[channel] = taps;
+        
+        //  Don't set rate until we have enough taps
+        if (taps.length < 3) return;
         
         // Calculate average bpm
         var intervals = taps.length - 1;
@@ -408,14 +415,18 @@ StantonSCS3d.Agent = function(device) {
     }
     
     function watchmulti(controls, handler) {
-        var values = [];
-        var wait = controls.length
-        var i = 0;
-        for (; i < controls.length; i++) {
+        var values = {};
+        var wait = 0;
+        for (k in controls) {
+            wait += 1;
             (function() {
-                var controlpos = i;
-                watch(controls[controlpos][0], controls[controlpos][1], function(value) {
-                    values[controlpos] = value;
+                var valuePos = k;
+                watch(controls[k][0], controls[k][1], function(value) {
+                    values[valuePos] = value;
+                    
+                    // Call handler once all values are collected
+                    // The simplistic wait countdown works because watch()
+                    // triggers all controls and they answer in series
                     if (wait > 1) {
                         wait -= 1;
                     } else {
@@ -507,6 +518,62 @@ StantonSCS3d.Agent = function(device) {
                 tell([light[0], light[1], i <= pos]);
             }
         }
+    }
+    
+    // Show a spinning light in remembrance of analog technology
+    function spinLight(channel, warnDuration) {
+        watchmulti({
+            'position': [channel, 'playposition'],
+            'duration': [channel, 'duration'],
+            'play':     [channel, 'play'],
+            'rate':     [channel, 'rate'],
+            'range':    [channel, 'rateRange']
+        }, function(values) {
+            // Duration is not rate-corrected
+            var duration = values.duration;
+
+            // Which means the seconds we get are not rate-corrected either.
+            // They tick faster for higher rates.
+            var seconds = duration * values.position;
+
+            // 33⅓rpm = 100 / 3 / 60 rounds/second = 1.8 seconds/round
+            var rounds = seconds / 1.8;
+            
+            // Fractional part is needle's position in the circle
+            var needle = rounds % 1;
+
+            var lights = device.slider.circle.meter;
+            var count = lights.length;
+            var pos = count - Math.floor(needle * count) - 1; // Zero-based index
+
+            // Add a warning indicator for the last seconds of a song
+            var left = duration - seconds;
+            
+            // Because the seconds are not rate-corrected, we must scale
+            // warnDuration according to pitch rate.
+            var scaledWarnDuration = warnDuration + warnDuration * ((values.rate - 0.5) * 2 * values.range);
+
+            var warnPos = false;
+            if (left < scaledWarnDuration) {
+                // Add a blinking light that runs a tad slower so the needle
+                // will reach it when the track runs out
+                var warnLight = (needle + (left / scaledWarnDuration)) % 1;
+                warnPos = count - Math.floor(warnLight * count) - 1;
+            }
+
+            var i = 0;
+            for (; i < count; i++) {
+                if (i === warnPos) {
+                    comm.mask(lights[i], function(value, ticks) {
+                        return (ticks % 2 > 0) ? !value : value; 
+                    }, true);
+                } else if (i === pos) {
+                    comm.mask(lights[i], function(value) { return !value; }); // Invert
+                } else {
+                    comm.unmask(lights[i]);
+                }
+            }
+        });
     }
 
     // absolute control
@@ -740,48 +807,7 @@ StantonSCS3d.Agent = function(device) {
         expect(device.button.tap.touch, function() { taps(channel); });
         watch(channel, 'beat_active', binarylight(device.button.tap.light.black, device.button.tap.light.red));
 
-        watch(channel, 'playposition', function(position) {
-            // Duration is not rate-corrected
-            var duration = engine.getValue(channel, 'duration');
-
-            // Which means the seconds we get are not rate-corrected either.
-            // They tick faster for higher rates.
-            var seconds = duration * position;
-
-            // 33⅓rpm = 100 / 3 / 60 rounds/second = 1.8 seconds/round
-            var rounds = seconds / 1.8;
-            
-            // Fractional part is needle's position in the circle
-            var needle = rounds % 1;
-
-            var lights = device.slider.circle.meter;
-            var count = lights.length;
-            var pos = count - Math.floor(needle * count) - 1; // Zero-based index
-
-            // Add a warning indicator for the last seconds of a song
-            var left = duration - seconds;
-            var warnDuration = 30; // Seconds FIXME not rate-corrected.
-            var warnPos = false;
-            if (left < warnDuration) {
-                // Add a blinking light that runs a tad slower so the needle
-                // will reach it when the time runs out
-                var warnLight = (rounds + (left / warnDuration)) % 1;
-                warnPos = count - Math.floor(warnLight * count) - 1;
-            }
-
-            var i = 0;
-            for (; i < count; i++) {
-                if (i === pos) {
-                    comm.mask(lights[i], function(value) { return !value; }); // Invert
-                } else if (i === warnPos) {
-                    comm.mask(lights[i], function(value, ticks) {
-                        return (ticks % 4 > 2) ? !value : value; 
-                    }, true);
-                } else {
-                    comm.unmask(lights[i]);
-                }
-            }
-        });
+        spinLight(channel, 30);
 
         // Read deck state from unrelated control which may be set by the 3m
         // Among all the things WRONG about this, two stand out:
@@ -797,7 +823,7 @@ StantonSCS3d.Agent = function(device) {
         start: function() {
             tell(device.modeset.flat);
             patchage();
-            if (!timer) timer = engine.beginTimer(50, comm.tick);
+            if (!timer) timer = engine.beginTimer(100, comm.tick);
         },
         receive: comm.receive,
         stop: function() {
