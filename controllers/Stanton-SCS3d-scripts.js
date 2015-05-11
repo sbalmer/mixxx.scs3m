@@ -250,6 +250,8 @@ StantonSCS3d.Comm = function() {
             var cid = CID(message);
             mask[cid] = mod;
             dirty[cid] = true;
+            
+            if (changes) ticking[cid] = true;
         },
         
         unmask: function(message) {
@@ -520,6 +522,18 @@ StantonSCS3d.Agent = function(device) {
         }
     }
     
+    // Create a function that returns the value or its boolean inverse
+    // First parameter controls the blink rate where bigger is slower
+    // (starts at 1; 2 is half the speed)
+    // Second parameter controls the ration of inverted to not inverted
+    // (ration of 0 means no inversion, 1 means all inverted)
+    function Blinker(rate, ratio) {
+         rate = rate * 2;
+        return function(value, ticks) {
+            return ((ticks / rate) % 1) < ratio ? !value : value;
+        }
+    }
+    
     // Show a spinning light in remembrance of analog technology
     function spinLight(channel, warnDuration) {
         watchmulti({
@@ -544,7 +558,14 @@ StantonSCS3d.Agent = function(device) {
 
             var lights = device.slider.circle.meter;
             var count = lights.length;
-            var pos = count - Math.floor(needle * count) - 1; // Zero-based index
+            var playable = values.duration > 0 && values.position < 1;
+            var paused = !values.play && playable;
+            var pos = false;
+            
+            // Don't show position indicator when the end is reached
+            if (playable) {
+                pos = count - Math.floor(needle * count) - 1; // Zero-based index
+            }
 
             // Add a warning indicator for the last seconds of a song
             var left = duration - seconds;
@@ -554,7 +575,7 @@ StantonSCS3d.Agent = function(device) {
             var scaledWarnDuration = warnDuration + warnDuration * ((values.rate - 0.5) * 2 * values.range);
 
             var warnPos = false;
-            if (left < scaledWarnDuration) {
+            if (playable && left < scaledWarnDuration) {
                 // Add a blinking light that runs a tad slower so the needle
                 // will reach it when the track runs out
                 var warnLight = (needle + (left / scaledWarnDuration)) % 1;
@@ -564,11 +585,13 @@ StantonSCS3d.Agent = function(device) {
             var i = 0;
             for (; i < count; i++) {
                 if (i === warnPos) {
-                    comm.mask(lights[i], function(value, ticks) {
-                        return (ticks % 2 > 0) ? !value : value; 
-                    }, true);
+                    comm.mask(lights[i], Blinker(1, 0.3), true);
                 } else if (i === pos) {
-                    comm.mask(lights[i], function(value) { return !value; }); // Invert
+                    if (paused) {
+                        comm.mask(lights[i], Blinker(3, 0.1), true);
+                    } else {
+                        comm.mask(lights[i], function(value) { return !value; }); // Invert
+                    }
                 } else {
                     comm.unmask(lights[i]);
                 }
@@ -791,11 +814,23 @@ StantonSCS3d.Agent = function(device) {
         // Reset circle lights
         Bar(device.slider.circle.meter)(0);
         
-        // Call the patch function that was put into the switch with engage()
+        // Call the patch function that was put into the switch with cycle()
         activeMode.active()(channel);
 
         expect(device.button.play.touch, toggle(channel, 'play'));
-        watch(channel, 'play', binarylight(device.button.play.light.black, device.button.play.light.red));
+        watchmulti({
+            play: [channel, 'play'],
+            position: [channel, 'playposition'],
+            duration: [channel, 'duration']
+        }, function(values) {
+            tell(device.button.play.light[values.play ? 'red' : 'black']);
+            if (!values.play && values.position < 1 && values.duration > 0) {
+                comm.mask(device.button.play.light.red, Blinker(3, 0.1), true);
+            } else {
+                comm.unmask(device.button.play.light.red);
+            }
+        });
+        
         
         expect(device.button.cue.touch, setConst(channel, 'cue_default', true));
         expect(device.button.cue.release, setConst(channel, 'cue_default', false));
