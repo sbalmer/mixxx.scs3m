@@ -330,6 +330,45 @@ StantonSCS3d.Comm = function() {
 }
 
 
+StantonSCS3d.Syncopath = function() {
+    // Lists of last ten taps, per deck, in epoch milliseconds
+    var deckTaps = {};
+
+    return function(channel) {
+        var now = new Date().getTime();
+        var taps = deckTaps[channel] || [];
+
+        var last = taps[0] || 0;
+        var delta = now - last;
+        taps.unshift(now);
+        taps = taps.slice(0, 8); // Keep eight
+        deckTaps[channel] = taps;
+        
+        // Don't set rate when the taps are stale or we don't have enough taps
+        if (delta > 2000 || taps.length < 3) {
+            return;
+        }
+        
+        // Calculate average bpm
+        var intervals = taps.length - 1;
+        var beatLength = (taps[0] - taps[intervals]) / intervals;
+        var bpm = 60000 / beatLength; // millis to 1/minutes
+        
+        // The desired pitch rate depends on the BPM of the track
+        var rate = bpm / engine.getValue(channel, "file_bpm");
+
+        // Balk on outlandish rates
+        if (isNaN(rate) || rate < 0.05 || rate > 50) return;
+        
+        // Translate rate into pitch slider position
+        // This depends on the configured range of the slider
+        var pitchPos = (rate - 1) / engine.getValue(channel, "rateRange");
+        
+        engine.setValue(channel, "rate", pitchPos);
+    };
+}
+
+
 StantonSCS3d.Agent = function(device) {
 
     // Multiple controller ID may be specified in the MIDI messages used
@@ -356,6 +395,7 @@ StantonSCS3d.Agent = function(device) {
     }
     
     var comm = StantonSCS3d.Comm();
+    var taps = StantonSCS3d.Syncopath();
 
     function expect(control, handler) {
         demux(function(control) {
@@ -697,7 +737,7 @@ StantonSCS3d.Agent = function(device) {
         expect(device.button.sync.touch, setConst(channel, 'beatsync', true));
         tell(device.button.sync.light.black);
         
-        expect(device.button.tap.touch, function() { bpm.tapButton(channelno); });
+        expect(device.button.tap.touch, function() { taps(channel); });
         watch(channel, 'beat_active', binarylight(device.button.tap.light.black, device.button.tap.light.red));
 
         watch(channel, 'playposition', function(position) {
