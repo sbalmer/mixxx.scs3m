@@ -449,13 +449,19 @@ StantonSCS3d.Agent = function(device) {
     // Return a handler that lights LED from the bottom of the meter
     // For zero values no light is turned on
     function Bar(lights) {
-        var range = lights.length;
+        var count = lights.length;
+        var range = count - 1;
         return function(value) {
-            var pos = Math.max(0, Math.min(range, Math.round(value * range))) - 1; // Zero-based index, -1 means no light
+            var pos;
+            if (value == 0) {
+                pos = -1; // no light
+            } else {
+                pos = Math.max(0, Math.min(range, Math.round(value * range)));
+            }
             var i = 0;
-            for (; i < range; i++) {
+            for (; i < lights.length; i++) {
                 var light = lights[i];
-                tell([light[0], light[1], i >= pos]);
+                tell([light[0], light[1], i <= pos]);
             }
         }
     }
@@ -672,6 +678,9 @@ StantonSCS3d.Agent = function(device) {
         expect(device.mode.trig.touch, repatch(activeMode.cycle(trigpatches)));
         expect(device.mode.vinyl.touch, repatch(activeMode.cycle([vinylpatch])));
         expect(device.mode.deck.touch, repatch(side.toggle));
+        
+        // Reset circle lights
+        Bar(device.slider.circle.meter)(0);
         
         // Call the patch function that was put into the switch with engage()
         activeMode.active()(channel);
