@@ -198,7 +198,10 @@ StantonSCS3d.Comm = function() {
     var ticks = 0;
     
     // Handler functions indexed by CID
-    receivers = {};
+    var receivers = {};
+    
+    // List of handlers for control changes from the engine
+    var watched = {};
     
     function send() {
         for (cid in dirty) {
@@ -273,6 +276,16 @@ StantonSCS3d.Comm = function() {
             }
             mask = {};
             // base and actual are not cleared
+            
+            
+            // I'd like to disconnect all controls on clear, but that doesn't
+            // work when using closure callbacks. So we just don't listen to 
+            // those
+            for (ctrl in watched) {
+                if (watched.hasOwnProperty(ctrl)) {
+                    watched[ctrl] = [];
+                }
+            }
         },
         
         expect: function(message, handler) {
@@ -287,6 +300,31 @@ StantonSCS3d.Comm = function() {
                 handler(value);
                 send();
             }
+        },
+        
+        watch: function(channel, control, handler) {
+            var ctrl = channel + control;
+
+            if (!watched[ctrl]) {
+                watched[ctrl] = [];
+                engine.connectControl(channel, control, function(value, group, control) { 
+                    var handlers = watched[ctrl];
+                    if (handlers.length) {
+                        // Fetching parameter value is easier than mapping to [0..1] range ourselves
+                        value = engine.getParameter(group, control);
+                        
+                        var i = 0;
+                        for(; i < handlers.length; i++) {
+                            handlers[i](value);
+                        }
+                        send();
+                    }
+                });
+            }
+
+            watched[ctrl].push(handler);
+            
+            engine.trigger(channel, control);
         }
     };
 }
@@ -318,53 +356,15 @@ StantonSCS3d.Agent = function(device) {
     }
     
     var comm = StantonSCS3d.Comm();
-    
-    // Connected engine controls
-    var watched = {};
-    
-    function clear() {
-        comm.clear();
 
-        // I'd like to disconnect everything on clear, but that doesn't work when using closure callbacks, I guess I'd have to pass the callback function as string name
-        // I'd have to invent function names for all handlers
-        // Instead I'm not gonna bother and just let the callbacks do nothing
-        for (ctrl in watched) {
-            if (watched.hasOwnProperty(ctrl)) {
-                watched[ctrl] = [];
-            }
-        }
-    }
-
-    
     function expect(control, handler) {
         demux(function(control) {
             comm.expect(control, handler);
         })(control);
     }
-    
+
     function watch(channel, control, handler) {
-        // Silly indirection through a registry that keeps all watched controls
-        var ctrl = channel + control;
-
-        if (!watched[ctrl]) {
-            watched[ctrl] = [];
-            engine.connectControl(channel, control, function(value, group, control) { 
-                var handlers = watched[ctrl];
-                if (handlers.length) {
-                    // Fetching parameter value is easier than mapping to [0..1] range ourselves
-                    value = engine.getParameter(group, control);
-                    
-                    var i = 0;
-                    for(; i < handlers.length; i++) {
-                        handlers[i](value);
-                    }
-                }
-            });
-        }
-
-        watched[ctrl].push(handler);
-        
-        engine.trigger(channel, control);
+        comm.watch(channel, control, handler);
     }
     
     function watchmulti(controls, handler) {
@@ -585,9 +585,8 @@ StantonSCS3d.Agent = function(device) {
         return function(value) {
             var changed = handler(value);
             if (changed) {
-                clear();
+                comm.clear();
                 patchage();
-                print("repatched "+Object.keys(receivers).length+" receivers and watching "+Object.keys(watched).length+" controls");
             }
         }
     }
@@ -715,23 +714,30 @@ StantonSCS3d.Agent = function(device) {
             // Fractional part is needle's position in the circle
             var needle = rounds % 1;
 
-            var left = duration - seconds;
-            var warnDuration = 30; // Seconds
-            
             var lights = device.slider.circle.meter;
             var count = lights.length;
-            var pos = count - Math.floor(needle * count); // Zero-based index
-            var warnPos = (left < warnDuration) && pos + Math.floor(left / warnDuration * count);
+            var pos = count - Math.floor(needle * count) - 1; // Zero-based index
+
+            // Add a warning indicator for the last seconds of a song
+            var left = duration - seconds;
+            var warnDuration = 30; // Seconds
+            var warnPos = false;
+            if (left < warnDuration) {
+                // Add a blinking light that runs a tad slower so the needle
+                // will reach it when the time runs out
+                var warnLight = (rounds + (left / warnDuration)) % 1;
+                print(warnLight)
+                warnPos = count - Math.floor(warnLight * count) - 1;
+            }
+
             var i = 0;
             for (; i < count; i++) {
                 if (i === pos) {
                     comm.mask(lights[i], function(value) { return !value; }); // Invert
                 } else if (i === warnPos) {
-                    // Add a blinking light that runs a tad slower so the
-                    // needle light will reach it after warnDuration
-                    if (needle % 0.05 > 0.025) { // Blink 20 times per revolution
-                        comm.mask(lights[i], function(value) { return !value; }); // Invert
-                    }
+                    comm.mask(lights[i], function(value, ticks) {
+                        return (ticks % 4 > 2) ? !value : value; 
+                    }, true);
                 } else {
                     comm.unmask(lights[i]);
                 }
@@ -752,7 +758,7 @@ StantonSCS3d.Agent = function(device) {
         start: function() {
             tell(device.modeset.flat);
             patchage();
-            if (!timer) timer = engine.beginTimer(100, comm.tick);
+            if (!timer) timer = engine.beginTimer(50, comm.tick);
         },
         receive: comm.receive,
         stop: function() {
