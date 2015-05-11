@@ -14,6 +14,7 @@ StantonSCS3d.receive = function(channel, control, value, status) {
     StantonSCS3d.agent.receive(status, control, value);
 }
 
+
 /* MIDI map */
 StantonSCS3d.Device = function(channel) {
     var NoteOn = 0x90 + channel;
@@ -84,8 +85,8 @@ StantonSCS3d.Device = function(channel) {
     }
 
 
-    // Stanton changed the mapping of the fields in button mode in newer devices.
-    // Originally, in button mode, the right and left column held 4 "buttons"
+    // Stanton changed button mode in newer devices.
+    // Originally, in button mode, the three columns held 4 "buttons"
     // each. Hitting one of those without accidentally touching another requires 
     // very accurate motor control beyond the capabilities of a DJ (even when 
     // sober). Later versions of the device send only two buttons per column
@@ -200,7 +201,7 @@ StantonSCS3d.Comm = function() {
     receivers = {};
     
     function send() {
-        for (cid in Object.keys(dirty)) {
+        for (cid in dirty) {
             var message = base[cid];
             if (!message) continue; // As long as no base is set, don't send anything
             
@@ -218,8 +219,8 @@ StantonSCS3d.Comm = function() {
                 }
             } else {
                 var value = message[2];
-                if (mask[cid]) value = mask[cid](value, ticks); 
-                if (lastMessage[cid][2] != value) {
+                if (mask[cid]) value = mask[cid](value, ticks);
+                if (!lastMessage || lastMessage[2] != value) {
                     midi.sendShortMsg(message[0], message[1], value);
                     actual[cid] = message;
                 }
@@ -242,7 +243,6 @@ StantonSCS3d.Comm = function() {
     
         mask: function(message, mod, changes) {
             var cid = CID(message);
-
             mask[cid] = mod;
             dirty[cid] = true;
         },
@@ -291,7 +291,7 @@ StantonSCS3d.Comm = function() {
 
 
 StantonSCS3d.Agent = function(device) {
-    
+
     // Multiple controller ID may be specified in the MIDI messages used
     // internally. The output functions will demux and run the same action on
     // both messages.
@@ -302,31 +302,18 @@ StantonSCS3d.Agent = function(device) {
     function demux(action) {
         return function(message, nd) {
             var changed = false;
-            if (message[1]) {
-                if (message[1].length) {
-                    var i;
-                    for (i in message[1]) {
-                        var demuxd = [message[0], message[1][i], message[2]];
-                        changed = action(demuxd, nd) || changed;
-                    }
-                } else {
-                    changed = action(message, nd);
+            if (message[1].length) {
+                var i;
+                for (i in message[1]) {
+                    var demuxd = [message[0], message[1][i], message[2]];
+                    changed = action(demuxd, nd) || changed;
                 }
+            } else {
+                changed = action(message, nd);
             }
             return changed;
         }
     }
-    
-    // debugging helper
-    var printmess = demux(function(message) {
-        var i;
-        var s = '';
-
-        for (i in message) {
-            s = s + ('0' + message[i].toString(16)).slice(-2)
-        }
-        print("Midi "+s);
-    });
     
     var comm = StantonSCS3d.Comm();
     
@@ -642,8 +629,9 @@ StantonSCS3d.Agent = function(device) {
     function vinylpatch() {
         tell(device.mode.vinyl.light.red);
     }
-    
+
     function patchage() {
+
         // You win two insanity points if you don't properly misunderstand this
         var channelno = activeChannel[side.choose(0, 1)].choose(side.choose(1, 2), side.choose(3, 4));
         var channel = '[Channel'+channelno+']';
