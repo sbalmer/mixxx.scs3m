@@ -525,12 +525,12 @@ StantonSCS3d.Agent = function(device) {
     // Create a function that returns the value or its boolean inverse
     // First parameter controls the blink rate where bigger is slower
     // (starts at 1; 2 is half the speed)
-    // Second parameter controls the ration of inverted to not inverted
-    // (ration of 0 means no inversion, 1 means all inverted)
-    function Blinker(rate, ratio) {
-         rate = rate * 2;
+    // Second parameter provides a blink pattern which is a list of bits
+    // [1,0] alternate
+    // [1,0,1,0,0,0,0,0] heartbeat
+    function Blinker(rate, pattern) {
         return function(value, ticks) {
-            return ((ticks / rate) % 1) < ratio ? !value : value;
+            return pattern[Math.floor(ticks / rate) % pattern.length] ? !value : value;
         }
     }
     
@@ -585,10 +585,10 @@ StantonSCS3d.Agent = function(device) {
             var i = 0;
             for (; i < count; i++) {
                 if (i === warnPos) {
-                    comm.mask(lights[i], Blinker(1, 0.3), true);
+                    comm.mask(lights[i], Blinker(1, [1,0,1,0,0,0,0,0,0]), true);
                 } else if (i === pos) {
                     if (paused) {
-                        comm.mask(lights[i], Blinker(3, 0.1), true);
+                        comm.mask(lights[i], Blinker(3, [1,0,0]), true);
                     } else {
                         comm.mask(lights[i], function(value) { return !value; }); // Invert
                     }
@@ -825,7 +825,7 @@ StantonSCS3d.Agent = function(device) {
         }, function(values) {
             tell(device.button.play.light[values.play ? 'red' : 'black']);
             if (!values.play && values.position < 1 && values.duration > 0) {
-                comm.mask(device.button.play.light.red, Blinker(3, 0.1), true);
+                comm.mask(device.button.play.light.red, Blinker(3, [1,0,0]), true);
             } else {
                 comm.unmask(device.button.play.light.red);
             }
