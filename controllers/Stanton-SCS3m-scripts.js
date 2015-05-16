@@ -1,7 +1,6 @@
 "use strict";
 
 // issues:
-// - fx mode not mapped, what to put there?
 // - filterHigh/Mid/Low is deprecated, what is the replacement? 
 
 // manually test messages
@@ -112,11 +111,8 @@ StantonSCS3m.Device = function() {
         function Deck() {
             var id = either(0x10, 0x0F);
             return {
-                light: {
-                    off: [NoteOn, id, 0],
-                    first: [NoteOn, id, 1],
-                    second: [NoteOn, id, 2],
-                    both: [NoteOn, id, 3]
+                light: function (bits) {
+                    return [NoteOn, id, (bits[0] ? 1 : 0) | (bits[1] ? 2 : 0)]
                 },
                 touch: [NoteOn, id],
                 release: [NoteOff, id]
@@ -147,12 +143,12 @@ StantonSCS3m.Device = function() {
         }
         
         function Touches() {
-            return {
-                one: Touch(either(0x00, 0x01)),
-                two: Touch(either(0x02, 0x03)),
-                three: Touch(either(0x04, 0x05)),
-                four: Touch(either(0x06, 0x07)),
-            }
+            return [
+                Touch(either(0x00, 0x01)),
+                Touch(either(0x02, 0x03)),
+                Touch(either(0x04, 0x05)),
+                Touch(either(0x06, 0x07)),
+            ];
         }
         
         function Phones() {
@@ -204,9 +200,6 @@ StantonSCS3m.Agent = function(device) {
     // Connected engine controls
     var watched = {};
     
-    // No operation 
-    function nop() {};
-    
     function clear() {
         receivers = {};
         slow = [];
@@ -217,7 +210,7 @@ StantonSCS3m.Agent = function(device) {
         // Instead I'm not gonna bother and just let the callbacks do nothing
         for (ctrl in watched) {
             if (watched.hasOwnProperty(ctrl)) {
-                watched[ctrl] = nop;
+                watched[ctrl] = [];
             }
         }
     }
@@ -241,16 +234,23 @@ StantonSCS3m.Agent = function(device) {
         var ctrl = channel + control;
 
         if (!watched[ctrl]) {
-            engine.connectControl(channel, control, function(value, group, control) {
-                if (watched[ctrl]) {
+            watched[ctrl] = [];
+            engine.connectControl(channel, control, function(value, group, control) { 
+                var handlers = watched[ctrl];
+                if (handlers.length) {
                     // Fetching parameter value is easier than mapping to [0..1] range ourselves
                     value = engine.getParameter(group, control);
-                    watched[ctrl](value); 
+                    
+                    var i = 0;
+                    for(; i < handlers.length; i++) {
+                        handlers[i](value);
+                    }
                 }
             });
         }
-        watched[ctrl] = handler;
         
+        watched[ctrl].push(handler);
+
         if (loading) {
             // ugly UGLY workaround
             // The device does not light meters again if they haven't changed from last value before resetting flat mode
@@ -261,7 +261,25 @@ StantonSCS3m.Agent = function(device) {
         }
         
         engine.trigger(channel, control);
-
+    }
+    
+    function watchmulti(controls, handler) {
+        var values = [];
+        var wait = controls.length
+        var i = 0;
+        for (; i < controls.length; i++) {
+            (function() {
+                var controlpos = i;
+                watch(controls[controlpos][0], controls[controlpos][1], function(value) {
+                    values[controlpos] = value;
+                    if (wait > 1) {
+                        wait -= 1;
+                    } else {
+                        handler(values);
+                    }
+                });
+            })();
+        }
     }
     
     
@@ -394,9 +412,9 @@ StantonSCS3m.Agent = function(device) {
         }
     }
     
-    function reset(channel, control, value) {
+    function reset(channel, control) {
         return function() {
-            engine.setValue(channel, control, value);
+            engine.reset(channel, control);
         }
     }
 
@@ -430,12 +448,27 @@ StantonSCS3m.Agent = function(device) {
         }
     }
     
+    function Multiswitch(preset) {
+        var engaged = preset;
+        return {
+            'engage': function(pos) { return function() { engaged = pos; }  },
+            'cancel': function(pos) { return function() { if (engaged === pos) engaged = preset; } },
+            'engaged': function(pos) { return engaged === pos },
+            'choose': function(pos, off, on) { return (engaged === pos) ? on : off; }
+        }
+    }
+    
     var master = Switch(); // Whether master key is held
     var deck = {
         left: Switch(), // off: channel1, on: channel3
         right: Switch() // off: channel2, on: channel4
     }
 
+    var overlay = {
+        left:  Multiswitch('eq'),
+        right: Multiswitch('eq')
+    }
+    
     var eqheld = {
         left: Switch(),
         right: Switch()
@@ -455,11 +488,23 @@ StantonSCS3m.Agent = function(device) {
     }
     
     function patchage() {
+        
         function Side(side) {
             var part = device[side];
+
+            // Light the top half or bottom half of the EQ sliders to show chosen deck
+            function deckflash(handler) {
+                return function(value) {
+                    handler(value);
+                    var lightval = deck[side].choose(1, 0); // First deck is the upper one
+                    tellslowly([part.eq.high.meter.centerbar(lightval)]);
+                    tellslowly([part.eq.mid.meter.centerbar(lightval)]);
+                    tellslowly([part.eq.low.meter.centerbar(lightval)]);
+                }
+            }
             
             // Switch deck/channel when button is touched
-            expect(part.deck.touch, repatch(deck[side].toggle));
+            expect(part.deck.touch, deckflash(repatch(deck[side].toggle)));
             tell(part.deck.light[deck[side].choose('first', 'second')]);
 
             function either(left, right) { return (side == 'left') ? left : right }
@@ -467,57 +512,115 @@ StantonSCS3m.Agent = function(device) {
             var channelno = deck[side].choose(either(1,2), either(3,4));
             var channel = '[Channel'+channelno+']';
             var effectchannel = '[QuickEffectRack1_[Channel'+channelno+']]';
+            var effectunit = '[EffectRack1_EffectUnit'+channelno+']';
+            var effectunit_enable = 'group_'+channel+'_enable';
             var eqsideheld = eqheld[side];
+            var sideoverlay = overlay[side];
+            
+            // Light the corresponding deck (channel 1: A, channel 2: B, channel 3: C, channel 4: D)
+            // Make the lights blink on each beat
+            function beatlight(translator, activepos) {
+                return function(bits) {
+                    bits = bits.slice(); // clone
+                    bits[activepos] = !bits[activepos]; // Invert the bit for the light that should be on
+                    return translator(bits);
+                }
+            }
+            watchmulti([
+                ['[Channel'+either(1,2)+']', 'beat_active'],
+                ['[Channel'+either(3,4)+']', 'beat_active'],
+            ], patch(beatlight(part.deck.light, deck[side].choose(0,1))));
 
             if (!master.engaged()) {            
                 tellslowly([
                     part.pitch.mode.absolute,
                     part.pitch.mode.end
                 ]);
-                expect(part.pitch.slide, eqsideheld.choose(
-                    set(effectchannel, 'super1'),
-                    reset(effectchannel, 'super1', 0.5)
-                ));
-                watch(effectchannel, 'super1', offcenter(patch(part.pitch.meter.centerbar)));
+                if (sideoverlay.engaged('eq')) {
+                    expect(part.pitch.slide, eqsideheld.choose(
+                        set(effectchannel, 'super1'),
+                        reset(effectchannel, 'super1')
+                    ));
+                    watch(effectchannel, 'super1', offcenter(patch(part.pitch.meter.centerbar)));
+                }
             }
-            
-            expect(part.eq.high.slide, eqsideheld.choose(
-                set(channel, 'filterHigh'),
-                reset(channel, 'filterHigh', 1)
-            ));
-            expect(part.eq.mid.slide, eqsideheld.choose(
-                set(channel, 'filterMid'),
-                reset(channel, 'filterMid', 1)
-            ));
-            expect(part.eq.low.slide, eqsideheld.choose(
-                set(channel, 'filterLow'),
-                reset(channel, 'filterLow', 1)
-            ));
-            watch(channel, 'filterHigh',patch(offcenter(part.eq.high.meter.centerbar)));
-            watch(channel, 'filterMid', patch(offcenter(part.eq.mid.meter.centerbar)));
-            watch(channel, 'filterLow', patch(offcenter(part.eq.low.meter.centerbar)));
+
+            if (sideoverlay.engaged('eq')) {
+                expect(part.eq.high.slide, eqsideheld.choose(
+                    set(channel, 'filterHigh'),
+                    reset(channel, 'filterHigh')
+                ));
+                expect(part.eq.mid.slide, eqsideheld.choose(
+                    set(channel, 'filterMid'),
+                    reset(channel, 'filterMid')
+                ));
+                expect(part.eq.low.slide, eqsideheld.choose(
+                    set(channel, 'filterLow'),
+                    reset(channel, 'filterLow')
+                ));
+                watch(channel, 'filterHigh',patch(offcenter(part.eq.high.meter.centerbar)));
+                watch(channel, 'filterMid', patch(offcenter(part.eq.mid.meter.centerbar)));
+                watch(channel, 'filterLow', patch(offcenter(part.eq.low.meter.centerbar)));
+            }
 
             expect(part.modes.eq.touch, repatch(eqsideheld.engage));
             expect(part.modes.eq.release, repatch(eqsideheld.cancel));
-            tell(part.modes.eq.light[eqsideheld.choose('red', 'purple')]);
-            
+            tell(part.modes.eq.light[eqsideheld.choose(sideoverlay.choose('eq', 'blue', 'red'), 'purple')]);
+           
             var fxsideheld = fxheld[side];
+
+            var tnr = 0;
+            for (; tnr < 4; tnr++) {
+                var touch = part.touches[tnr];
+                var fxchannel = channel;
+                if (master.engaged()) {
+                    fxchannel = either('[Headphone]', '[Master]');
+                }
+                var effectunit = '[EffectRack1_EffectUnit'+(tnr+1)+']';
+                var effectunit_enable = 'group_'+fxchannel+'_enable';
+                var effectunit_effect = '[EffectRack1_EffectUnit'+(tnr+1)+'_Effect1]';
+                
+                if (fxsideheld.engaged() || master.engaged()) {
+                    expect(touch.touch, toggle(effectunit, effectunit_enable));
+                } else {
+                    expect(touch.touch, repatch(sideoverlay.engage(tnr)));
+                }
+                expect(touch.release, repatch(sideoverlay.cancel(tnr)));
+                if (sideoverlay.engaged(tnr)) {
+                    tell(touch.light.purple);
+                } else {
+                    watch(effectunit, effectunit_enable, binarylight(touch.light.blue, touch.light.red));
+                }
+                
+                if (sideoverlay.engaged(tnr)) {
+                    expect(part.pitch.slide, eqsideheld.choose(
+                        set(effectunit, 'mix'),
+                        reset(effectunit, 'mix')
+                    ));
+                    watch(effectunit, 'mix', patch(part.pitch.meter.bar));
+
+                    expect(part.eq.high.slide, eqsideheld.choose(
+                        set(effectunit_effect, 'parameter3'),
+                        reset(effectunit_effect, 'parameter3')
+                    ));
+                    expect(part.eq.mid.slide, eqsideheld.choose(
+                        set(effectunit_effect, 'parameter2'),
+                        reset(effectunit_effect, 'parameter2')
+                    ));
+                    expect(part.eq.low.slide, eqsideheld.choose(
+                        set(effectunit_effect, 'parameter1'),
+                        reset(effectunit_effect, 'parameter1')
+                    ));
+                    watch(effectunit_effect, 'parameter3', patch(part.eq.high.meter.needle));
+                    watch(effectunit_effect, 'parameter2', patch(part.eq.mid.meter.needle));
+                    watch(effectunit_effect, 'parameter1', patch(part.eq.low.meter.needle));
+                }
+            }
+
             expect(part.modes.fx.touch, repatch(fxsideheld.engage));
             expect(part.modes.fx.release, repatch(fxsideheld.cancel));
             tell(part.modes.fx.light[fxsideheld.choose('blue', 'purple')]);
-
-            expect(part.touches.one.touch, reset(channel, 'back', 1));
-            expect(part.touches.one.release, reset(channel, 'back', 0));
-            watch(channel, 'back', binarylight(part.touches.one.light.blue, part.touches.one.light.red));
-            expect(part.touches.two.touch, reset(channel, 'fwd', 1));
-            expect(part.touches.two.release, reset(channel, 'fwd', 0));
-            watch(channel, 'fwd', binarylight(part.touches.two.light.blue, part.touches.two.light.red));
-            expect(part.touches.three.touch, reset(channel, 'cue_default', 1));
-            expect(part.touches.three.release, reset(channel, 'cue_default', 0));
-            watch(channel, 'cue_default', binarylight(part.touches.three.light.blue, part.touches.three.light.red));
-            expect(part.touches.four.touch, toggle(channel, 'play'));
-            watch(channel, 'play', binarylight(part.touches.four.light.blue, part.touches.four.light.red));
-            
+          
             if (!master.engaged()) {         
                 if (fxsideheld.engaged()) {
                     tellslowly([
@@ -566,14 +669,14 @@ StantonSCS3m.Agent = function(device) {
             watch("[Master]", "headMix", patch(device.left.pitch.meter.centerbar));
             expect(device.left.pitch.slide, 
                 eqheld.left.engaged() || fxheld.left.engaged()
-                ? reset('[Master]', 'headMix', -1)
+                ? reset('[Master]', 'headMix')
                 : set('[Master]', 'headMix')
             );
             
             watch("[Master]", "balance", patch(device.right.pitch.meter.centerbar));
             expect(device.right.pitch.slide, 
                 eqheld.right.engaged() || fxheld.right.engaged()
-                ? reset('[Master]', 'balance', 0)
+                ? reset('[Master]', 'balance')
                 : set('[Master]', 'balance')
             );
             
