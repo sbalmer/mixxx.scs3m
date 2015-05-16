@@ -64,8 +64,10 @@ StantonSCS3d.Device = function(channel) {
             meter: Meter(meterid, lights),
             slide: {
                 abs: [CC, id],
-                rel: [CC, id + 1]
-            }
+                rel: [CC, id + 1],
+                
+            },
+            release: [NoteOff, id]
         }
     }
     
@@ -608,6 +610,13 @@ StantonSCS3d.Agent = function(device) {
         }
     }
 
+    function setEither(channel, controlLow, controlHigh) {
+        return function(value) {
+            engine.setParameter(channel, controlLow, value < 63);
+            engine.setParameter(channel, controlHigh, value > 63);
+        }
+    }
+
     function setConst(channel, control, value) {
         return function() {
             engine.setParameter(channel, control, value);
@@ -798,8 +807,23 @@ StantonSCS3d.Agent = function(device) {
         Trigpatch(2)
     ];
 
-    function vinylpatch() {
+    function vinylpatch(channel) {
+        tell(device.modeset.circle);
         tell(device.mode.vinyl.light.red);
+        
+        var setTempRate = setEither(channel, 'rate_temp_down', 'rate_temp_up');
+        
+        expect(device.slider.middle.slide.abs, setTempRate);
+        expect(device.slider.middle.release, function() {
+            setTempRate(63); // Neutral
+        });
+        
+        watchmulti({
+            'down': [channel, 'rate_temp_down'],
+            'up': [channel, 'rate_temp_up']
+        }, function(values) {
+            Centerbar(device.slider.middle.meter)((values.up - values.down) / 2 + 0.5);
+        });
     }
 
     function patchage() {
