@@ -656,33 +656,59 @@ StantonSCS3d.Agent = function(device) {
         }
     }
     
-    function Multiswitch(preset) {
-        var engaged = preset;
+    function Modeswitch(presetMode, presetPatches) {
+        var mode = presetMode;
+        var patches = presetPatches;
+        var engaged = patches[0];
+        var held = false;
+        var lastHold = 0;
+        var cycleOnRelease = false;
         return {
-            'cycle': function(pos) { return function() {
-                var last = pos.indexOf(engaged);
-                var next = 0;
-                if (last !== -1) {
-                    var next = (last + 1) % pos.length;
-                }
-                var prev = engaged;
-                engaged = pos[next];
-                return engaged !== prev;
-            }},
-            'engaged': function(pos) { return engaged === pos },
-            'active': function() { return engaged; },
-            'choose': function(pos, off, on) { return (engaged === pos) ? on : off; }
+            hold: function(newMode, newPatches) {
+                return function() {
+                    held = true;
+                    lastHold = new Date().getTime();
+
+                    var cycle = mode === newMode;
+                    cycleOnRelease = cycle;
+                    if (!cycle) {
+                        mode = newMode;
+                        patches = newPatches;
+                        engaged = patches[0];
+                    }
+                    return true;
+                };
+            },
+            held: function(queryMode) {
+                return mode === queryMode && held;
+            },
+            release: function(releasedMode) {
+                return function() {
+                    if (releasedMode === mode) {
+                        held = false;
+                        if (
+                            cycleOnRelease
+                         && new Date().getTime() - lastHold < 200
+                        ) {
+                            engaged = patches[(patches.indexOf(engaged) + 1) % patches.length];
+                        }
+                        return true;
+                    }
+                };
+            },
+            engaged: function() { return engaged; }
         }
     }
 
     // mode for each channel
     var mode = {
-        1: Multiswitch(vinylpatch),
-        2: Multiswitch(vinylpatch),
-        3: Multiswitch(vinylpatch),
-        4: Multiswitch(vinylpatch)
-    };
+        1: Modeswitch('vinyl', [vinylpatch]),
+        2: Modeswitch('vinyl', [vinylpatch]),
+        3: Modeswitch('vinyl', [vinylpatch]),
+        4: Modeswitch('vinyl', [vinylpatch])
+    }
     
+
     // left: false
     // right: true
     
@@ -804,18 +830,23 @@ StantonSCS3d.Agent = function(device) {
         tell(device.mode.loop.light.black);
         tell(device.mode.trig.light.black);
         tell(device.mode.vinyl.light.black);
-        expect(device.mode.fx.touch, repatch(activeMode.cycle([fxpatch])));
-        expect(device.mode.eq.touch, repatch(activeMode.cycle([eqpatch])));
-        expect(device.mode.loop.touch, repatch(activeMode.cycle([looppatch])));
-        expect(device.mode.trig.touch, repatch(activeMode.cycle(trigpatches)));
-        expect(device.mode.vinyl.touch, repatch(activeMode.cycle([vinylpatch])));
+        expect(device.mode.fx.touch,   repatch(activeMode.hold('fx', [fxpatch])));
+        expect(device.mode.fx.release, repatch(activeMode.release('fx')));
+        expect(device.mode.eq.touch,   repatch(activeMode.hold('eq', [eqpatch])));
+        expect(device.mode.eq.release, repatch(activeMode.release('eq')));
+        expect(device.mode.loop.touch,   repatch(activeMode.hold('loop', [looppatch])));
+        expect(device.mode.loop.release, repatch(activeMode.release('loop')));
+        expect(device.mode.trig.touch,   repatch(activeMode.hold('trig', trigpatches)));
+        expect(device.mode.trig.release, repatch(activeMode.release('trig')));
+        expect(device.mode.vinyl.touch,   repatch(activeMode.hold('vinyl', [vinylpatch])));
+        expect(device.mode.vinyl.release, repatch(activeMode.release('vinyl')));
         expect(device.mode.deck.touch, repatch(side.toggle));
         
         // Reset circle lights
         Bar(device.slider.circle.meter)(0);
         
         // Call the patch function that was put into the switch with cycle()
-        activeMode.active()(channel);
+        activeMode.engaged()(channel);
 
         expect(device.button.play.touch, toggle(channel, 'play'));
         watchmulti({
