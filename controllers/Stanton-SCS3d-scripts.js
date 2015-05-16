@@ -807,22 +807,26 @@ StantonSCS3d.Agent = function(device) {
         Trigpatch(2)
     ];
 
+    var resetTempRate = false;
+    
     function vinylpatch(channel) {
         tell(device.modeset.circle);
         tell(device.mode.vinyl.light.red);
         
         var setTempRate = setEither(channel, 'rate_temp_down', 'rate_temp_up');
+        resetTempRate = function() { setTempRate(63); };
         
         expect(device.slider.middle.slide.abs, setTempRate);
-        expect(device.slider.middle.release, function() {
-            setTempRate(63); // Neutral
-        });
+        expect(device.slider.middle.release, resetTempRate);
         
         watchmulti({
             'down': [channel, 'rate_temp_down'],
             'up': [channel, 'rate_temp_up']
         }, function(values) {
-            Centerbar(device.slider.middle.meter)((values.up - values.down) / 2 + 0.5);
+            var dir = (values.up - values.down) / 2 + 0.5;
+            Centerbar(device.slider.left.meter)(dir);
+            Centerbar(device.slider.middle.meter)(dir);
+            Centerbar(device.slider.right.meter)(dir);
         });
     }
 
@@ -875,7 +879,16 @@ StantonSCS3d.Agent = function(device) {
         expect(device.mode.deck.touch, repatch(side.toggle));
         
         // Reset circle lights
-        Bar(device.slider.circle.meter)(0);
+        Bar(device.slider.circle.meter)(0);            Bar(device.slider.left.meter)(0);
+        Bar(device.slider.middle.meter)(0);
+        Bar(device.slider.right.meter)(0);
+        
+        if (resetTempRate) {
+            // This is dirty because we don't know whether the temp rate was set by some other device
+            // Still better than not doing it
+            resetTempRate();
+            resetTempRate = false;
+        }
         
         // Call the patch function that was put into the switch with cycle()
         activeMode.engaged()(channel, activeMode.held());
