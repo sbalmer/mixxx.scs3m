@@ -610,13 +610,6 @@ StantonSCS3d.Agent = function(device) {
         }
     }
 
-    function setEither(channel, controlLow, controlHigh) {
-        return function(value) {
-            engine.setParameter(channel, controlLow, value < 63);
-            engine.setParameter(channel, controlHigh, value > 63);
-        }
-    }
-
     function setConst(channel, control, value) {
         return function() {
             engine.setParameter(channel, control, value);
@@ -748,6 +741,8 @@ StantonSCS3d.Agent = function(device) {
             mode[1].release(true);
             mode[2].release(true);
             mode[3].release(true);
+            resetRollingLoop();
+            resetTempRate();
         }
         return changed;
     }
@@ -859,8 +854,15 @@ StantonSCS3d.Agent = function(device) {
         tell(device.modeset.circle);
         tell(device.mode.vinyl.light.red);
         
-        var setTempRate = setEither(channel, 'rate_temp_down', 'rate_temp_up');
-        resetTempRate = function() { setTempRate(63); };
+        resetTempRate = function() {
+            engine.setParameter(channel, 'rate_temp_down', false);
+            engine.setParameter(channel, 'rate_temp_up', false);
+        };
+
+        var setTempRate = function(value) {
+            engine.setParameter(channel, 'rate_temp_down', value < 63);
+            engine.setParameter(channel, 'rate_temp_up', value > 63);
+        }
         
         expect(device.slider.middle.slide.abs, setTempRate);
         expect(device.slider.middle.release, resetTempRate);
@@ -901,6 +903,11 @@ StantonSCS3d.Agent = function(device) {
 
         watch(channel, 'volume', Bar(device.gain.meter));
 
+        // This is dirty because we don't know whether these were set by other
+        // interfaces. Should be improved. Still better than not doing it.
+        if (resetTempRate) resetTempRate();
+        if (resetRollingLoop) resetRollingLoop();
+
         var activeMode = mode[channelno];
         tell(device.mode.fx.light.black);
         tell(device.mode.eq.light.black);
@@ -923,15 +930,6 @@ StantonSCS3d.Agent = function(device) {
         Bar(device.slider.circle.meter)(0);            Bar(device.slider.left.meter)(0);
         Bar(device.slider.middle.meter)(0);
         Bar(device.slider.right.meter)(0);
-        
-        if (resetTempRate) {
-            // This is dirty because we don't know whether the temp rate was set by some other device
-            // Still better than not doing it
-            resetTempRate();
-            resetTempRate = false;
-        }
-        
-        if (resetRollingLoop) resetRollingLoop();
         
         // Call the patch function that was put into the switch with cycle()
         activeMode.engaged()(channel, activeMode.held());
