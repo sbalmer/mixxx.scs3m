@@ -679,12 +679,12 @@ StantonSCS3d.Agent = function(device) {
                     return true;
                 };
             },
-            held: function(queryMode) {
-                return mode === queryMode && held;
+            held: function() {
+                return held;
             },
             release: function(releasedMode) {
                 return function() {
-                    if (releasedMode === mode) {
+                    if (releasedMode === mode || releasedMode === true) {
                         held = false;
                         if (
                             cycleOnRelease
@@ -734,6 +734,13 @@ StantonSCS3d.Agent = function(device) {
                    activeChannel[0].change(value & 0x1) && !side.engaged() // Left side carried in first bit
                 || activeChannel[1].change(value & 0x2) && side.engaged(); // Right side in second bit
         }
+        if (changed) {
+            // Prevent stuck mode buttons on deck switch
+            mode[0].release(true);
+            mode[1].release(true);
+            mode[2].release(true);
+            mode[3].release(true);
+        }
         return changed;
     }
     
@@ -769,7 +776,7 @@ StantonSCS3d.Agent = function(device) {
     }
 
     function Trigpatch(trigset) {
-        return function(channel) {
+        return function(channel, held) {
             tell(device.modeset.button);
             tell(device.mode.trig.light.bits(trigset+1));
 
@@ -778,7 +785,8 @@ StantonSCS3d.Agent = function(device) {
             for (; i < 5; i++) {
                 var hotcue = offset + i + 1;
                 var field = device.field[i];
-                expect(field.touch, setConst(channel, 'hotcue_'+hotcue+'_activate', true));
+                var action = 'hotcue_'+hotcue+'_'+(held ? 'clear' : 'activate');
+                expect(field.touch, setConst(channel, action, true));
                 watch(channel, 'hotcue_'+hotcue+'_enabled', binarylight(field.light.black, field.light.red));
             }
         }
@@ -846,7 +854,7 @@ StantonSCS3d.Agent = function(device) {
         Bar(device.slider.circle.meter)(0);
         
         // Call the patch function that was put into the switch with cycle()
-        activeMode.engaged()(channel);
+        activeMode.engaged()(channel, activeMode.held());
 
         expect(device.button.play.touch, toggle(channel, 'play'));
         watchmulti({
