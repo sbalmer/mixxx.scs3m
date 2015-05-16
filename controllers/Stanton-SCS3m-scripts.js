@@ -707,11 +707,11 @@ StantonSCS3m.Agent = function(device) {
         
         // Communicate currently selected channel of each deck so SCS3d can read it
         // THIS USES A CONTROL FOR ULTERIOR PURPOSES AND IS VERY NAUGHTY INDEED
-        reset('[PreviewDeck1]', 'quantize', 
+        engine.setValue('[PreviewDeck1]', 'quantize', 
               0x4 // Setting bit three communicates that we're sending deck state
                 | deck.left.engaged() // left side is in bit one
                 | deck.right.engaged() << 1 // right side bit two
-        )(); // Doesn't violate the Geneva conventions
+        );
     }
     
     function throttle() {

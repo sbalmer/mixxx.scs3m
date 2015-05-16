@@ -737,12 +737,12 @@ StantonSCS3d.Agent = function(device) {
         }
         if (changed) {
             // Prevent stuck mode buttons on deck switch
-            mode[0].release(true);
             mode[1].release(true);
             mode[2].release(true);
             mode[3].release(true);
-            resetRollingLoop();
-            resetTempRate();
+            mode[4].release(true);
+            if (resetRollingLoop) resetRollingLoop();
+            if (resetTempRate) resetTempRate();
         }
         return changed;
     }
