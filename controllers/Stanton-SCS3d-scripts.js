@@ -780,8 +780,55 @@ StantonSCS3d.Agent = function(device) {
         expect(device.slider.right.slide.abs, set(channel, 'filterHigh'));
     }
 
-    function looppatch() {
+    function looppatch(channel) {
+        tell(device.modeset.circle);
         tell(device.mode.loop.light.red);
+
+        expect(device.slider.circle.slide.abs, function(value) {
+            var lr = ((value + 63) % 128 - 63);
+            var exp = Math.round(Math.max(-5, Math.min(6, lr / 8)));
+            var len = Math.pow(2, exp);
+
+            set(channel, 'beatloop_'+len+'_activate')(true);
+            
+            var lr = (191 - value) % 128;
+            var loop_index = Math.floor(lr / 16);
+            Centerbar(device.slider.circle.meter)(lr/128);
+        });
+        
+        expect(device.slider.middle.release, function(value) {
+            set(channel, 'reloop_exit')(1);
+            Bar(device.slider.circle.meter)(0);
+        });
+    }
+    
+    var resetRollingLoop = false;
+    
+    function looprollpatch(channel) {
+        tell(device.modeset.circle);
+        tell(device.mode.loop.light.blue);
+
+        expect(device.slider.circle.slide.abs, function(value) {
+            var lr = ((value + 63) % 128 - 63);
+            var exp = Math.round(Math.max(-5, Math.min(6, lr / 8)));
+            var len = Math.pow(2, exp);
+
+            set(channel, 'beatlooproll_'+len+'_activate')(true);
+            
+            var lr = (191 - value) % 128;
+            var loop_index = Math.floor(lr / 16);
+            Centerbar(device.slider.circle.meter)(lr/128);
+            
+            resetRollingLoop = function() { 
+                set(channel, 'reloop_exit')(1); 
+                resetRollingLoop = false;
+            };
+        });
+        
+        expect(device.slider.circle.release, function(value) {
+            if (resetRollingLoop) resetRollingLoop();
+            Bar(device.slider.circle.meter)(0);
+        });
     }
 
     function Trigpatch(trigset) {
@@ -870,7 +917,7 @@ StantonSCS3d.Agent = function(device) {
         expect(device.mode.fx.release, repatch(activeMode.release('fx')));
         expect(device.mode.eq.touch,   repatch(activeMode.hold('eq', [eqpatch])));
         expect(device.mode.eq.release, repatch(activeMode.release('eq')));
-        expect(device.mode.loop.touch,   repatch(activeMode.hold('loop', [looppatch])));
+        expect(device.mode.loop.touch,   repatch(activeMode.hold('loop', [looppatch, looprollpatch])));
         expect(device.mode.loop.release, repatch(activeMode.release('loop')));
         expect(device.mode.trig.touch,   repatch(activeMode.hold('trig', trigpatches)));
         expect(device.mode.trig.release, repatch(activeMode.release('trig')));
@@ -889,6 +936,8 @@ StantonSCS3d.Agent = function(device) {
             resetTempRate();
             resetTempRate = false;
         }
+        
+        if (resetRollingLoop) resetRollingLoop();
         
         // Call the patch function that was put into the switch with cycle()
         activeMode.engaged()(channel, activeMode.held());
