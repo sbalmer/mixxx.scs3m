@@ -94,9 +94,10 @@ StantonSCS3d.Device = function(channel) {
     // sober). Later versions of the device send only two buttons per column
     // (top/bottom), these are easy to hit.
     //
-    // So not only do we need two id to map to the same field, we want to control
-    // multiple lights for this control as well. This is why we're using the plural 
-    // here. The respective functions expect() and tell() know about this.
+    // So not only do we need two id to map to the same field, we want to
+    // control multiple lights for this control as well. This is why we're using 
+    // the plural here. The respective functions expect() and tell() know about
+    // this, see demux().
     function Field(ids, lightids) {
         return {
             touch: [NoteOn, ids],
@@ -184,7 +185,7 @@ StantonSCS3d.Comm = function() {
     
     // Modifier functions over base, indexed by CID
     // The functions receive the last byte of the message and return the
-    // modified value. They don't 
+    // modified value.
     var mask = {};
     
     // List of masks that depend on time
@@ -213,7 +214,7 @@ StantonSCS3d.Comm = function() {
             var last = actual[cid];
             if (message.length > 3) {
                 // Sysex messages are expected to be modesetting messages
-                // They are expected to differ in the second last byte
+                // They are assumed to differ in the second last byte
                 if (
                     last
                  || last != message[message.length-2]
@@ -280,8 +281,7 @@ StantonSCS3d.Comm = function() {
             }
             mask = {};
             // base and actual are not cleared
-            
-            
+
             // I'd like to disconnect all controls on clear, but that doesn't
             // work when using closure callbacks. So we just don't listen to 
             // those
@@ -423,7 +423,7 @@ StantonSCS3d.Agent = function(device) {
         var wait = 0;
         for (k in controls) {
             wait += 1;
-            (function() {
+            (function() { // Close over valuePos
                 var valuePos = k;
                 watch(controls[k][0], controls[k][1], function(value) {
                     values[valuePos] = value;
@@ -731,7 +731,6 @@ StantonSCS3d.Agent = function(device) {
     ];
     
     // Glean current channels from control value
-    // This part is willfully obtuse and a bad idea
     function gleanChannel(value) {
         // Changed must be set to true if the deck was changed on the current side
         var changed = false;
@@ -891,11 +890,6 @@ StantonSCS3d.Agent = function(device) {
         //  Main | 1: black | 2: red
         //  Alt  | 3: blue  | 4: purple
         //
-        // If we subtract one from the channelno this maps exactly to the SCS
-        // color coding. Don't you marvel at the clean mapping between the two
-        // concepts? I started out with this simplistic scheme, decided that it
-        // fits well, then made up reasons in favour of it. Laziness be my
-        // witness.
         tell(device.mode.deck.light.bits(channelno-1));
         tell(device.decklight[0](!activeChannel[side.choose(0, 1)].engaged()));
         tell(device.decklight[1](activeChannel[side.choose(0, 1)].engaged()));
