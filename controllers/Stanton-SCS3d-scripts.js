@@ -528,12 +528,15 @@ StantonSCS3d.Agent = function(device) {
     // First parameter controls the blink rate where bigger is slower
     // (starts at 1; 2 is half the speed)
     // Second parameter provides a blink pattern which is a list of bits
-    // [1,0] alternate
-    // [1,0,1,0,0,0,0,0] heartbeat
     function Blinker(rate, pattern) {
         return function(value, ticks) {
             return pattern[Math.floor(ticks / rate) % pattern.length] ? !value : value;
         }
+    }
+    
+    var blinken = {
+        ready: new Blinker(3, [1,0,0]),
+        heartbeat: new Blinker(1, [1,0,1,0,0,0,0,0,0]),
     }
     
     // Show a spinning light in remembrance of analog technology
@@ -587,10 +590,10 @@ StantonSCS3d.Agent = function(device) {
             var i = 0;
             for (; i < count; i++) {
                 if (i === warnPos) {
-                    comm.mask(lights[i], Blinker(1, [1,0,1,0,0,0,0,0,0]), true);
+                    comm.mask(lights[i], blinken.heartbeat, true);
                 } else if (i === pos) {
                     if (paused) {
-                        comm.mask(lights[i], Blinker(3, [1,0,0]), true);
+                        comm.mask(lights[i], blinken.ready, true);
                     } else {
                         comm.mask(lights[i], function(value) { return !value; }); // Invert
                     }
@@ -942,7 +945,7 @@ StantonSCS3d.Agent = function(device) {
         }, function(values) {
             tell(device.button.play.light[values.play ? 'red' : 'black']);
             if (!values.play && values.position < 1 && values.duration > 0) {
-                comm.mask(device.button.play.light.red, Blinker(3, [1,0,0]), true);
+                comm.mask(device.button.play.light.red, blinken.ready, true);
             } else {
                 comm.unmask(device.button.play.light.red);
             }
