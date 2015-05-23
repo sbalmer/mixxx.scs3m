@@ -1,3 +1,10 @@
+// Issues
+// - Loop indicators are not reset when another track is loaded
+
+// Useful tinkering commands, channel reset and flat mode
+// amidi -p hw:1 -S F00001600200F7
+// amidi -p hw:1 -S F07E000601F7
+
 StantonSCS3d = {};
 
 StantonSCS3d.init = function(id) {
@@ -16,10 +23,10 @@ StantonSCS3d.receive = function(channel, control, value, status) {
 
 
 /* MIDI map */
-StantonSCS3d.Device = function(channel) {
-    var NoteOn = 0x90 + channel;
-    var NoteOff = 0x80 + channel;
-    var CC = 0xB0 + channel;
+StantonSCS3d.Device = function() {
+    var NoteOn = 0x90;
+    var NoteOff = 0x80;
+    var CC = 0xB0;
     
     var black = 0x00;
     var blue = 0x02;
@@ -108,11 +115,14 @@ StantonSCS3d.Device = function(channel) {
 
     return {
         modeset: {
-            version: [0xF0, 0x7E, channel, 0x06, 0x01, 0xF7],
-            flat: [0xF0, 0x00, 0x01, 0x60, 0x10, 0x00, 0xF7],
-            circle: [0xF0, 0x00, 0x01, 0x60, 0x01, 0x00, 0xF7],
-            slider: [0xF0, 0x00, 0x01, 0x60, 0x01, 0x03, 0xF7],
-            button: [0xF0, 0x00, 0x01, 0x60, 0x01, 0x04, 0xF7]
+            // Byte three is the channel
+            version: [0xF0, 0x7E, 0x00, 0x06, 0x01, 0xF7],
+            flat:    [0xF0, 0x00, 0x01, 0x60, 0x10, 0x00, 0xF7],
+            circle:  [0xF0, 0x00, 0x01, 0x60, 0x01, 0x00, 0xF7],
+            slider:  [0xF0, 0x00, 0x01, 0x60, 0x01, 0x03, 0xF7],
+            button:  [0xF0, 0x00, 0x01, 0x60, 0x01, 0x04, 0xF7],
+            // Byte 6 sets the channel
+            channel: [0xF0, 0x00, 0x01, 0x60, 0x02, 0x00, 0xF7]
         },
         logo: Logo(),
         decklight: [
@@ -206,32 +216,24 @@ StantonSCS3d.Comm = function() {
     // List of handlers for control changes from the engine
     var watched = {};
     
+    // Last sent SYSEX message
+    var actual_sysex = [];
+    
     function send() {
         for (cid in dirty) {
             var message = base[cid];
             if (!message) continue; // As long as no base is set, don't send anything
             
             var last = actual[cid];
-            if (message.length > 3) {
-                // Sysex messages are expected to be modesetting messages
-                // They are assumed to differ in the second last byte
-                if (
-                    last
-                 || last != message[message.length-2]
-                ) {
-                    midi.sendSysexMsg(message, message.length);
-                    actual[cid] = message[message.length-2];
-                }
+
+            var value = message[2];
+            if (mask[cid]) {
+                value = mask[cid](value, ticks);
             } else {
-                var value = message[2];
-                if (mask[cid]) {
-                    value = mask[cid](value, ticks);
-                } else {
-                }
-                if (last === undefined || last != value) {
-                    midi.sendShortMsg(message[0], message[1], value);
-                    actual[cid] = value;
-                }
+            }
+            if (last === undefined || last != value) {
+                midi.sendShortMsg(message[0], message[1], value);
+                actual[cid] = value;
             }
         }
         dirty = {};
@@ -329,6 +331,19 @@ StantonSCS3d.Comm = function() {
             watched[ctrl].push(handler);
             
             engine.trigger(channel, control);
+        },
+        
+        sysex: function(message) {
+            if (message.length == actual_sysex.length) {
+                var same = true;
+                for (i in message) {
+                    same = same && message[i] === actual_sysex[i];
+                }
+                if (same) return;
+            }
+
+            midi.sendSysexMsg(message, message.length);
+            actual_sysex = message;
         }
     };
 }
@@ -766,7 +781,7 @@ StantonSCS3d.Agent = function(device) {
     }
 
     function eqpatch(channel) {
-        tell(device.modeset.slider);
+        comm.sysex(device.modeset.slider);
         tell(device.mode.eq.light.red);
         watch(channel, 'filterLow', Centerbar(device.slider.left.meter)); 
         watch(channel, 'filterMid', Centerbar(device.slider.middle.meter)); 
@@ -778,7 +793,7 @@ StantonSCS3d.Agent = function(device) {
     }
 
     function looppatch(channel) {
-        tell(device.modeset.circle);
+        comm.sysex(device.modeset.circle);
         tell(device.mode.loop.light.red);
 
         expect(device.slider.circle.slide.abs, function(value) {
@@ -802,7 +817,7 @@ StantonSCS3d.Agent = function(device) {
     var resetRollingLoop = false;
     
     function looprollpatch(channel) {
-        tell(device.modeset.circle);
+        comm.sysex(device.modeset.circle);
         tell(device.mode.loop.light.blue);
 
         expect(device.slider.circle.slide.abs, function(value) {
@@ -830,7 +845,7 @@ StantonSCS3d.Agent = function(device) {
 
     function Trigpatch(trigset) {
         return function(channel, held) {
-            tell(device.modeset.button);
+            comm.sysex(device.modeset.button);
             tell(device.mode.trig.light.bits(trigset+1));
 
             var i = 0;
@@ -854,7 +869,7 @@ StantonSCS3d.Agent = function(device) {
     var resetTempRate = false;
     
     function vinylpatch(channel) {
-        tell(device.modeset.circle);
+        comm.sysex(device.modeset.circle);
         tell(device.mode.vinyl.light.red);
         
         resetTempRate = function() {
@@ -976,7 +991,11 @@ StantonSCS3d.Agent = function(device) {
 
     return {
         start: function() {
-            tell(device.modeset.flat);
+            // Tell it to use channel 0 and set it to flat mode
+            comm.sysex(device.modeset.channel); 
+            comm.sysex(device.modeset.flat);
+
+            // Initial setup
             patchage();
             if (!timer) timer = engine.beginTimer(100, comm.tick);
         },
