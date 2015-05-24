@@ -1,3 +1,10 @@
+// Issues
+// - Loop indicators are not reset when another track is loaded
+
+// Useful tinkering commands, channel reset and flat mode
+// amidi -p hw:1 -S F00001600200F7
+// amidi -p hw:1 -S F07E000601F7
+
 StantonSCS3d = {};
 
 StantonSCS3d.init = function(id) {
@@ -16,10 +23,10 @@ StantonSCS3d.receive = function(channel, control, value, status) {
 
 
 /* MIDI map */
-StantonSCS3d.Device = function(channel) {
-    var NoteOn = 0x90 + channel;
-    var NoteOff = 0x80 + channel;
-    var CC = 0xB0 + channel;
+StantonSCS3d.Device = function() {
+    var NoteOn = 0x90;
+    var NoteOff = 0x80;
+    var CC = 0xB0;
     
     var black = 0x00;
     var blue = 0x02;
@@ -108,11 +115,14 @@ StantonSCS3d.Device = function(channel) {
 
     return {
         modeset: {
-            version: [0xF0, 0x7E, channel, 0x06, 0x01, 0xF7],
-            flat: [0xF0, 0x00, 0x01, 0x60, 0x10, 0x00, 0xF7],
-            circle: [0xF0, 0x00, 0x01, 0x60, 0x01, 0x00, 0xF7],
-            slider: [0xF0, 0x00, 0x01, 0x60, 0x01, 0x03, 0xF7],
-            button: [0xF0, 0x00, 0x01, 0x60, 0x01, 0x04, 0xF7]
+            // Byte three is the channel
+            version: [0xF0, 0x7E, 0x00, 0x06, 0x01, 0xF7],
+            flat:    [0xF0, 0x00, 0x01, 0x60, 0x10, 0x00, 0xF7],
+            circle:  [0xF0, 0x00, 0x01, 0x60, 0x01, 0x00, 0xF7],
+            slider:  [0xF0, 0x00, 0x01, 0x60, 0x01, 0x03, 0xF7],
+            button:  [0xF0, 0x00, 0x01, 0x60, 0x01, 0x04, 0xF7],
+            // Byte 6 sets the channel
+            channel: [0xF0, 0x00, 0x01, 0x60, 0x02, 0x00, 0xF7]
         },
         logo: Logo(),
         decklight: [
@@ -206,32 +216,23 @@ StantonSCS3d.Comm = function() {
     // List of handlers for control changes from the engine
     var watched = {};
     
+    // Last sent SYSEX message
+    var actual_sysex = [];
+    
     function send() {
         for (cid in dirty) {
             var message = base[cid];
             if (!message) continue; // As long as no base is set, don't send anything
             
             var last = actual[cid];
-            if (message.length > 3) {
-                // Sysex messages are expected to be modesetting messages
-                // They are assumed to differ in the second last byte
-                if (
-                    last
-                 || last != message[message.length-2]
-                ) {
-                    midi.sendSysexMsg(message, message.length);
-                    actual[cid] = message[message.length-2];
-                }
-            } else {
-                var value = message[2];
-                if (mask[cid]) {
-                    value = mask[cid](value, ticks);
-                } else {
-                }
-                if (last === undefined || last != value) {
-                    midi.sendShortMsg(message[0], message[1], value);
-                    actual[cid] = value;
-                }
+
+            var value = message[2];
+            if (mask[cid]) {
+                value = mask[cid](value, ticks);
+            }
+            if (last === undefined || last != value) {
+                midi.sendShortMsg(message[0], message[1], value);
+                actual[cid] = value;
             }
         }
         dirty = {};
@@ -329,6 +330,19 @@ StantonSCS3d.Comm = function() {
             watched[ctrl].push(handler);
             
             engine.trigger(channel, control);
+        },
+        
+        sysex: function(message) {
+            if (message.length == actual_sysex.length) {
+                var same = true;
+                for (i in message) {
+                    same = same && message[i] === actual_sysex[i];
+                }
+                if (same) return;
+            }
+
+            midi.sendSysexMsg(message, message.length);
+            actual_sysex = message;
         }
     };
 }
@@ -528,12 +542,15 @@ StantonSCS3d.Agent = function(device) {
     // First parameter controls the blink rate where bigger is slower
     // (starts at 1; 2 is half the speed)
     // Second parameter provides a blink pattern which is a list of bits
-    // [1,0] alternate
-    // [1,0,1,0,0,0,0,0] heartbeat
     function Blinker(rate, pattern) {
         return function(value, ticks) {
             return pattern[Math.floor(ticks / rate) % pattern.length] ? !value : value;
         }
+    }
+    
+    var blinken = {
+        ready: new Blinker(3, [1,0,0]),
+        heartbeat: new Blinker(1, [1,0,1,0,0,0,0,0,0]),
     }
     
     // Show a spinning light in remembrance of analog technology
@@ -587,10 +604,10 @@ StantonSCS3d.Agent = function(device) {
             var i = 0;
             for (; i < count; i++) {
                 if (i === warnPos) {
-                    comm.mask(lights[i], Blinker(1, [1,0,1,0,0,0,0,0,0]), true);
+                    comm.mask(lights[i], blinken.heartbeat, true);
                 } else if (i === pos) {
                     if (paused) {
-                        comm.mask(lights[i], Blinker(3, [1,0,0]), true);
+                        comm.mask(lights[i], blinken.ready, true);
                     } else {
                         comm.mask(lights[i], function(value) { return !value; }); // Invert
                     }
@@ -763,7 +780,7 @@ StantonSCS3d.Agent = function(device) {
     }
 
     function eqpatch(channel) {
-        tell(device.modeset.slider);
+        comm.sysex(device.modeset.slider);
         tell(device.mode.eq.light.red);
         watch(channel, 'filterLow', Centerbar(device.slider.left.meter)); 
         watch(channel, 'filterMid', Centerbar(device.slider.middle.meter)); 
@@ -775,19 +792,40 @@ StantonSCS3d.Agent = function(device) {
     }
 
     function looppatch(channel) {
-        tell(device.modeset.circle);
+        comm.sysex(device.modeset.circle);
         tell(device.mode.loop.light.red);
 
+        // Available loop lengths are powers of two in the range [-5..6]
+        var lengths = [0.03125, 0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64];
         expect(device.slider.circle.slide.abs, function(value) {
-            var lr = ((value + 63) % 128 - 63);
-            var exp = Math.round(Math.max(-5, Math.min(6, lr / 8)));
-            var len = Math.pow(2, exp);
+            // Map to range [-63..64] where 0 is top center
+            var lr = ((value + 64) % 128 - 63);
+            
+            // Map the circle slider position to a loop length
+            var exp = Math.ceil(Math.max(-5, Math.min(6, lr / 8)));
+            var len = lengths[4 + exp]; // == Math.pow(2, exp);
 
             set(channel, 'beatloop_'+len+'_activate')(true);
-            
-            var lr = (191 - value) % 128;
-            var loop_index = Math.floor(lr / 16);
-            Centerbar(device.slider.circle.meter)(lr/128);
+        });
+                
+        
+        var engineControls = {};
+        lengths.forEach(function(len, index) {
+            engineControls[index] = [channel, 'beatloop_'+len+'_enabled'];
+        });
+        watchmulti(engineControls, function(values) {
+            var activeIndex = false;
+            lengths.forEach(function(len, index) {
+                if (values[index]) activeIndex = index;
+            });
+            if (activeIndex === false) {
+                // Turn off all lights
+                Bar(device.slider.circle.meter)(0);
+            } else {
+                Centerbar(device.slider.circle.meter)(
+                    (12.5 - activeIndex) / 16
+                );
+            }
         });
         
         expect(device.slider.middle.release, function(value) {
@@ -799,7 +837,7 @@ StantonSCS3d.Agent = function(device) {
     var resetRollingLoop = false;
     
     function looprollpatch(channel) {
-        tell(device.modeset.circle);
+        comm.sysex(device.modeset.circle);
         tell(device.mode.loop.light.blue);
 
         expect(device.slider.circle.slide.abs, function(value) {
@@ -827,7 +865,7 @@ StantonSCS3d.Agent = function(device) {
 
     function Trigpatch(trigset) {
         return function(channel, held) {
-            tell(device.modeset.button);
+            comm.sysex(device.modeset.button);
             tell(device.mode.trig.light.bits(trigset+1));
 
             var i = 0;
@@ -851,7 +889,7 @@ StantonSCS3d.Agent = function(device) {
     var resetTempRate = false;
     
     function vinylpatch(channel) {
-        tell(device.modeset.circle);
+        comm.sysex(device.modeset.circle);
         tell(device.mode.vinyl.light.red);
         
         resetTempRate = function() {
@@ -942,7 +980,7 @@ StantonSCS3d.Agent = function(device) {
         }, function(values) {
             tell(device.button.play.light[values.play ? 'red' : 'black']);
             if (!values.play && values.position < 1 && values.duration > 0) {
-                comm.mask(device.button.play.light.red, Blinker(3, [1,0,0]), true);
+                comm.mask(device.button.play.light.red, blinken.ready, true);
             } else {
                 comm.unmask(device.button.play.light.red);
             }
@@ -973,7 +1011,11 @@ StantonSCS3d.Agent = function(device) {
 
     return {
         start: function() {
-            tell(device.modeset.flat);
+            // Tell it to use channel 0 and set it to flat mode
+            comm.sysex(device.modeset.channel); 
+            comm.sysex(device.modeset.flat);
+
+            // Initial setup
             patchage();
             if (!timer) timer = engine.beginTimer(100, comm.tick);
         },
