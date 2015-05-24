@@ -229,7 +229,6 @@ StantonSCS3d.Comm = function() {
             var value = message[2];
             if (mask[cid]) {
                 value = mask[cid](value, ticks);
-            } else {
             }
             if (last === undefined || last != value) {
                 midi.sendShortMsg(message[0], message[1], value);
@@ -796,16 +795,37 @@ StantonSCS3d.Agent = function(device) {
         comm.sysex(device.modeset.circle);
         tell(device.mode.loop.light.red);
 
+        // Available loop lengths are powers of two in the range [-5..6]
+        var lengths = [0.03125, 0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64];
         expect(device.slider.circle.slide.abs, function(value) {
-            var lr = ((value + 63) % 128 - 63);
-            var exp = Math.round(Math.max(-5, Math.min(6, lr / 8)));
-            var len = Math.pow(2, exp);
+            // Map to range [-63..64] where 0 is top center
+            var lr = ((value + 64) % 128 - 63);
+            
+            // Map the circle slider position to a loop length
+            var exp = Math.ceil(Math.max(-5, Math.min(6, lr / 8)));
+            var len = lengths[4 + exp]; // == Math.pow(2, exp);
 
             set(channel, 'beatloop_'+len+'_activate')(true);
-            
-            var lr = (191 - value) % 128;
-            var loop_index = Math.floor(lr / 16);
-            Centerbar(device.slider.circle.meter)(lr/128);
+        });
+                
+        
+        var engineControls = {};
+        lengths.forEach(function(len, index) {
+            engineControls[index] = [channel, 'beatloop_'+len+'_enabled'];
+        });
+        watchmulti(engineControls, function(values) {
+            var activeIndex = false;
+            lengths.forEach(function(len, index) {
+                if (values[index]) activeIndex = index;
+            });
+            if (activeIndex === false) {
+                // Turn off all lights
+                Bar(device.slider.circle.meter)(0);
+            } else {
+                Centerbar(device.slider.circle.meter)(
+                    (12.5 - activeIndex) / 16
+                );
+            }
         });
         
         expect(device.slider.middle.release, function(value) {
