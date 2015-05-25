@@ -807,8 +807,7 @@ StantonSCS3d.Agent = function(device) {
 
             set(channel, 'beatloop_'+len+'_activate')(true);
         });
-                
-        
+
         var engineControls = {};
         lengths.forEach(function(len, index) {
             engineControls[index] = [channel, 'beatloop_'+len+'_enabled'];
@@ -863,6 +862,19 @@ StantonSCS3d.Agent = function(device) {
         });
     }
 
+    
+    /* Patch circle buttons to five hotcues
+     *
+     * left top = hotcue 1
+     * left bottom = hotcue 2
+     * right top = hotcue 3
+     * right bottom = hotcue 4
+     * center strip = hotcue 5
+     * 
+     * The trigset parameter selects the set of hotcues to
+     * activate. Passing 0 selects hotcues 1 through 5, passing 2
+     * selects hotcues 11 through 15.
+     */
     function Trigpatch(trigset) {
         return function(channel, held) {
             comm.sysex(device.modeset.button);
