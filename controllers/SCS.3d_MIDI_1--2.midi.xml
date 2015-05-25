@@ -1,10 +1,10 @@
 <?xml version='1.0' encoding='utf-8'?>
-<MixxxControllerPreset mixxxVersion="1.9.0+" schemaVersion="1">
+<MixxxMIDIPreset mixxxVersion="1.12.0+" schemaVersion="1">
     <info>
         <name>Stanton SCS.3d</name>
-        <author>Sean M. Pappalardo</author>
-        <description>This is a complete mapping for a single Stanton SCS.3d touch controller controlling two virtual decks. Requires scripting.</description>
-        <wiki>http://mixxx.org/wiki/doku.php/stanton_scs.3d</wiki>
+        <author>sbalmer</author>
+        <description>Mapping for the Stanton SCS3 system. This part maps the SCS.3d controller.</description>
+        <wiki></wiki>
     </info>
     <controller id="SCS.3d">
         <scriptfiles>

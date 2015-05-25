@@ -997,8 +997,7 @@ StantonSCS3d.Agent = function(device) {
                 comm.unmask(device.button.play.light.red);
             }
         });
-        
-        
+
         expect(device.button.cue.touch, setConst(channel, 'cue_default', true));
         expect(device.button.cue.release, setConst(channel, 'cue_default', false));
         watch(channel, 'cue_default', binarylight(device.button.cue.light.black, device.button.cue.light.red));

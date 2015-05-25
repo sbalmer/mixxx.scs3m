@@ -3,12 +3,12 @@
     <info>
         <name>Stanton SCS.3d</name>
         <author>sbalmer</author>
-        <description>Mapping for a single Stanton SCS.3d touch controller.</description>
-        <wiki>http://mixxx.org/wiki/doku.php/stanton_scs.3d</wiki>
+        <description>Mapping for the Stanton SCS3 system. This part maps the SCS.3d controller.</description>
+        <wiki></wiki>
     </info>
     <controller id="SCS.3d">
         <scriptfiles>
-            <file functionprefix="StantonSCS3d" filename="Stanton-SCS3d-scripts.js"/>
+            <file functionprefix="SCS3D" filename="Stanton-SCS3d-scripts.js"/>
         </scriptfiles>
         <controls>
             <control>
@@ -630,4 +630,4 @@
         </controls>
         <outputs/>
     </controller>
-</MixxxMidiPreset>
+</MixxxMIdIPreset>
