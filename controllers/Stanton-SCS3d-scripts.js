@@ -1,6 +1,3 @@
-// Issues
-// - Loop indicators are not reset when another track is loaded
-
 // Useful tinkering commands, channel reset and flat mode
 // amidi -p hw:1 -S F00001600200F7
 // amidi -p hw:1 -S F07E000601F7
@@ -791,77 +788,70 @@ StantonSCS3d.Agent = function(device) {
         expect(device.slider.right.slide.abs, set(channel, 'filterHigh'));
     }
 
-    function looppatch(channel) {
-        comm.sysex(device.modeset.circle);
-        tell(device.mode.loop.light.red);
 
-        // Available loop lengths are powers of two in the range [-5..6]
-        var lengths = [0.03125, 0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64];
-        expect(device.slider.circle.slide.abs, function(value) {
-            // Map to range [-63..64] where 0 is top center
-            var lr = ((value + 64) % 128 - 63);
-            
-            // Map the circle slider position to a loop length
-            var exp = Math.ceil(Math.max(-5, Math.min(6, lr / 8)));
-            var len = lengths[4 + exp]; // == Math.pow(2, exp);
-
-            set(channel, 'beatloop_'+len+'_activate')(true);
-        });
-
-        var engineControls = {};
-        lengths.forEach(function(len, index) {
-            engineControls[index] = [channel, 'beatloop_'+len+'_enabled'];
-        });
-        watchmulti(engineControls, function(values) {
-            var activeIndex = false;
-            lengths.forEach(function(len, index) {
-                if (values[index]) activeIndex = index;
-            });
-            if (activeIndex === false) {
-                // Turn off all lights
-                Bar(device.slider.circle.meter)(0);
-            } else {
-                Centerbar(device.slider.circle.meter)(
-                    (12.5 - activeIndex) / 16
-                );
-            }
-        });
-        
-        expect(device.slider.middle.release, function(value) {
-            set(channel, 'reloop_exit')(1);
-            Bar(device.slider.circle.meter)(0);
-        });
-    }
-    
     var resetRollingLoop = false;
-    
-    function looprollpatch(channel) {
-        comm.sysex(device.modeset.circle);
-        tell(device.mode.loop.light.blue);
 
-        expect(device.slider.circle.slide.abs, function(value) {
-            var lr = ((value + 63) % 128 - 63);
-            var exp = Math.round(Math.max(-5, Math.min(6, lr / 8)));
-            var len = Math.pow(2, exp);
+    function LoopPatch(rolling) {
+        return function(channel) {
+            comm.sysex(device.modeset.circle);
+            tell(rolling ? device.mode.loop.light.blue : device.mode.loop.light.red);
 
-            set(channel, 'beatlooproll_'+len+'_activate')(true);
+            // Available loop lengths are powers of two in the range [-5..6]
+            var lengths = [0.03125, 0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64];
+            expect(device.slider.circle.slide.abs, function(value) {
+                // Map to range [-63..64] where 0 is top center
+                var lr = ((value + 64) % 128 - 63);
+                
+                // Map the circle slider position to a loop length
+                var exp = Math.ceil(Math.max(-5, Math.min(6, lr / 8)));
+                var len = lengths[4 + exp]; // == Math.pow(2, exp);
+
+                if (rolling) {
+                    set(channel, 'beatlooproll_'+len+'_activate')(true);            
+                    resetRollingLoop = function() { 
+                        set(channel, 'reloop_exit')(1); 
+                        resetRollingLoop = false;
+                    };
+                } else {
+                    set(channel, 'beatloop_'+len+'_activate')(true);
+                }
+            });
+
+            var engineControls = {};
+            lengths.forEach(function(len, index) {
+                engineControls[index] = [channel, 'beatloop_'+len+'_enabled'];
+            });
+            watchmulti(engineControls, function(values) {
+                var activeIndex = false;
+                lengths.forEach(function(len, index) {
+                    if (values[index]) activeIndex = index;
+                });
+                if (activeIndex === false) {
+                    // Turn off all lights
+                    Bar(device.slider.circle.meter)(0);
+                } else {
+                    Centerbar(device.slider.circle.meter)(
+                        (12.5 - activeIndex) / 16
+                    );
+                }
+            });
             
-            var lr = (191 - value) % 128;
-            var loop_index = Math.floor(lr / 16);
-            Centerbar(device.slider.circle.meter)(lr/128);
-            
-            resetRollingLoop = function() { 
-                set(channel, 'reloop_exit')(1); 
-                resetRollingLoop = false;
-            };
-        });
-        
-        expect(device.slider.circle.release, function(value) {
-            if (resetRollingLoop) resetRollingLoop();
-            Bar(device.slider.circle.meter)(0);
-        });
+            if (rolling) {
+                expect(device.slider.circle.release, function(value) {
+                    if (resetRollingLoop) resetRollingLoop();
+                });
+            } else {
+                expect(device.slider.middle.release, function(value) {
+                    set(channel, 'reloop_exit')(1);
+                });
+            }
+        }
     }
 
+    looppatches = [
+        LoopPatch(false),
+        LoopPatch(true)
+    ];
     
     /* Patch circle buttons to five hotcues
      *
@@ -900,23 +890,31 @@ StantonSCS3d.Agent = function(device) {
 
     var resetTempRate = false;
     
+    /* Patch the circle for beatmatching.
+     * Sliding on the center bar will temporarily raise or lower the rate by a 
+     * fixed amount. The circle slider functions as a slow jog wheel. 
+     */
     function vinylpatch(channel) {
         comm.sysex(device.modeset.circle);
         tell(device.mode.vinyl.light.red);
-        
-        resetTempRate = function() {
+
+        var reset = function() {
             engine.setParameter(channel, 'rate_temp_down', false);
             engine.setParameter(channel, 'rate_temp_up', false);
+            resetTempRate = false;
         };
 
         var setTempRate = function(value) {
             engine.setParameter(channel, 'rate_temp_down', value < 63);
             engine.setParameter(channel, 'rate_temp_up', value > 63);
+            resetTempRate = reset;
         }
-        
+
         expect(device.slider.middle.slide.abs, setTempRate);
-        expect(device.slider.middle.release, resetTempRate);
-        
+        expect(device.slider.middle.release, function() { 
+            if (resetTempRate) resetTempRate();
+        });
+
         watchmulti({
             'down': [channel, 'rate_temp_down'],
             'up': [channel, 'rate_temp_up']
@@ -925,6 +923,10 @@ StantonSCS3d.Agent = function(device) {
             Centerbar(device.slider.left.meter)(dir);
             Centerbar(device.slider.middle.meter)(dir);
             Centerbar(device.slider.right.meter)(dir);
+        });
+
+        expect(device.slider.circle.slide.rel, function(value) {
+            engine.setParameter(channel, 'jog', (value - 64));
         });
     }
 
@@ -953,8 +955,6 @@ StantonSCS3d.Agent = function(device) {
 
         watch(channel, 'volume', Bar(device.gain.meter));
 
-        // This is dirty because we don't know whether these were set by other
-        // interfaces. Should be improved. Still better than not doing it.
         if (resetTempRate) resetTempRate();
         if (resetRollingLoop) resetRollingLoop();
 
@@ -968,7 +968,7 @@ StantonSCS3d.Agent = function(device) {
         expect(device.mode.fx.release, repatch(activeMode.release('fx')));
         expect(device.mode.eq.touch,   repatch(activeMode.hold('eq', [eqpatch])));
         expect(device.mode.eq.release, repatch(activeMode.release('eq')));
-        expect(device.mode.loop.touch,   repatch(activeMode.hold('loop', [looppatch, looprollpatch])));
+        expect(device.mode.loop.touch,   repatch(activeMode.hold('loop', looppatches)));
         expect(device.mode.loop.release, repatch(activeMode.release('loop')));
         expect(device.mode.trig.touch,   repatch(activeMode.hold('trig', trigpatches)));
         expect(device.mode.trig.release, repatch(activeMode.release('trig')));
