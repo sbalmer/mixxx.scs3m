@@ -4,7 +4,6 @@
         <name>Stanton SCS.3m</name>
         <author>sbalmer</author>
         <description>Mapping for the Stanton SCS3 system. This part maps the SCS.3m controller. Supports four decks.</description>
-        <wiki></wiki>
     </info>
     <controller id="SCS.3m">
         <scriptfiles>
