@@ -1,3 +1,8 @@
+// Issues
+// Turn off lights on shutdown
+// Sync timer ticks between controllers
+// Stuck play (maybe caused by using hotcue when not playing)
+
 // Useful tinkering commands, channel reset and flat mode
 // amidi -p hw:1 -S F00001600200F7
 // amidi -p hw:1 -S F07E000601F7
