@@ -1,6 +1,5 @@
 // Issues
 // Turn off lights on shutdown
-// Sync timer ticks between controllers
 // Stuck play (maybe caused by using hotcue when not playing)
 
 // Useful tinkering commands, channel reset and flat mode
@@ -858,6 +857,10 @@ StantonSCS3d.Agent = function(device) {
         LoopPatch(true)
     ];
     
+    // Keep track of hotcue to reset on layout changes or when another hotcue 
+    // becomes active.
+    var resetHotcue = false;
+    
     /* Patch circle buttons to five hotcues
      *
      * left top = hotcue 1
@@ -871,6 +874,41 @@ StantonSCS3d.Agent = function(device) {
      * selects hotcues 11 through 15.
      */
     function Trigpatch(trigset) {
+        var touchRelease = function(channel, field, control) {
+            // We need to send a zero when the control is released again.
+            // But this may happen after another control is touched.
+            // So the reset must happen whenever
+            // 1. this trigger button is released
+            // 2. another trigger button is touched
+            // 3. repatch() happens
+            //
+            // To avoid sending spurious resets we only do reset once after a
+            // touch. Unfortunately there is a border case we can't cover
+            // without intricate logic. For older devices two fields are
+            // merged into one but we receive note on then off when sliding
+            // between the two.
+            var cocked = 0;
+
+            var release = function() {
+                if (cocked == 1) engine.setValue(channel, control, 0);
+                if (cocked > 0) cocked -= 1;
+            };
+            expect(field.touch, function() {
+                // resetHotcue might be set by another hotcue
+                if (cocked == 0) {
+                    if (resetHotcue) resetHotcue();
+                    engine.setValue(channel, control, 1);
+                }
+                resetHotcue = function() {
+                    release();
+                    resetHotcue = false;
+                };
+                cocked += 1;
+
+            });
+            expect(field.release, release);
+        };
+
         return function(channel, held) {
             comm.sysex(device.modeset.button);
             tell(device.mode.trig.light.bits(trigset+1));
@@ -880,8 +918,11 @@ StantonSCS3d.Agent = function(device) {
             for (; i < 5; i++) {
                 var hotcue = offset + i + 1;
                 var field = device.field[i];
-                var action = 'hotcue_'+hotcue+'_'+(held ? 'clear' : 'activate');
-                expect(field.touch, setConst(channel, action, true));
+                if (held) {
+                    expect(field.touch, setConst(channel, 'hotcue_'+hotcue+'_clear', true));
+                } else {
+                    touchRelease(channel, field, 'hotcue_'+hotcue+'_activate');
+                }
                 watch(channel, 'hotcue_'+hotcue+'_enabled', binarylight(field.light.black, field.light.red));
             }
         }
@@ -962,6 +1003,7 @@ StantonSCS3d.Agent = function(device) {
 
         if (resetTempRate) resetTempRate();
         if (resetRollingLoop) resetRollingLoop();
+        if (resetHotcue) resetHotcue();
 
         var activeMode = mode[channelno];
         tell(device.mode.fx.light.black);
