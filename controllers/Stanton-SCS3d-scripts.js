@@ -759,8 +759,6 @@ StantonSCS3d.Agent = function(device) {
             mode[2].release(true);
             mode[3].release(true);
             mode[4].release(true);
-            if (resetRollingLoop) resetRollingLoop();
-            if (resetTempRate) resetTempRate();
         }
         return changed;
     }
