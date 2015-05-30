@@ -539,6 +539,26 @@ StantonSCS3d.Agent = function(device) {
         }
     }
     
+    // Light leds in the circle according to pattern
+    // Pattern is a two-dimensional array 3 x 7 of bools
+    function centerlights(pattern, rate) {
+        var slidernames = ['left', 'middle', 'right'];
+        for(y in slidernames) {
+            var lights = device.slider[slidernames[y]].meter;
+            for (x in lights) {
+                var light = lights[lights.length - 1 - x];
+                var pat = pattern[x][y];
+                if (pat.length) {
+                    // It moves!
+                    comm.mask([light[0], light[1]], Blinker(rate, pat), true);
+                } else {
+                    tell([light[0], light[1], pat]);
+                }
+            }
+        }
+    }
+
+
     // Create a function that returns the value or its boolean inverse
     // First parameter controls the blink rate where bigger is slower
     // (starts at 1; 2 is half the speed)
@@ -722,10 +742,10 @@ StantonSCS3d.Agent = function(device) {
 
     // mode for each channel
     var mode = {
-        1: Modeswitch('vinyl', [vinylpatch]),
-        2: Modeswitch('vinyl', [vinylpatch]),
-        3: Modeswitch('vinyl', [vinylpatch]),
-        4: Modeswitch('vinyl', [vinylpatch])
+        1: Modeswitch('vinyl', [vinylpatch, librarypatch]),
+        2: Modeswitch('vinyl', [vinylpatch, librarypatch]),
+        3: Modeswitch('vinyl', [vinylpatch, librarypatch]),
+        4: Modeswitch('vinyl', [vinylpatch, librarypatch])
     }
     
 
@@ -964,13 +984,40 @@ StantonSCS3d.Agent = function(device) {
             'up': [channel, 'rate_temp_up']
         }, function(values) {
             var dir = (values.up - values.down) / 2 + 0.5;
-            Centerbar(device.slider.left.meter)(dir);
-            Centerbar(device.slider.middle.meter)(dir);
-            Centerbar(device.slider.right.meter)(dir);
+            Centerbar(device.slider.left.meter)(dir-0.1);
+            Centerbar(device.slider.middle.meter)(dir+0.1);
+            Centerbar(device.slider.right.meter)(dir-0.1);
         });
 
         expect(device.slider.circle.slide.rel, function(value) {
             engine.setParameter(channel, 'jog', (value - 64));
+        });
+    }
+    
+        
+    /* Patch the circle for library browsing
+     * Touching the center bar loads the highlighted track into the deck.
+     * Sliding om the circle changes the highlighted track up or down. 
+     */
+    function librarypatch(channel) {
+        comm.sysex(device.modeset.circle);
+        tell(device.mode.vinyl.light.purple);
+        centerlights([
+            [0,[1,1,1,1,1,1,0,1],0],
+            [1,[1,1,1,1,0,0,1,1],1],
+            [0,[1,1,1,0,0,1,1,1],0],
+            [0,[1,1,0,0,1,1,1,1],0],
+            [0,[1,0,0,1,1,1,1,1],0],
+            [0,[0,0,1,1,1,1,1,1],0],
+            [0,[0,1,1,1,1,1,1,1],0]
+        ], 1);
+
+        expect(device.slider.middle.release, function() { 
+            engine.setValue(channel, 'LoadSelectedTrack', true);
+        });
+
+        expect(device.slider.circle.slide.rel, function(value) {
+            engine.setValue('[Playlist]', 'SelectTrackKnob', (value - 64));
         });
     }
 
@@ -1017,12 +1064,13 @@ StantonSCS3d.Agent = function(device) {
         expect(device.mode.loop.release, repatch(activeMode.release('loop')));
         expect(device.mode.trig.touch,   repatch(activeMode.hold('trig', trigpatches)));
         expect(device.mode.trig.release, repatch(activeMode.release('trig')));
-        expect(device.mode.vinyl.touch,   repatch(activeMode.hold('vinyl', [vinylpatch])));
+        expect(device.mode.vinyl.touch,   repatch(activeMode.hold('vinyl', [vinylpatch, librarypatch])));
         expect(device.mode.vinyl.release, repatch(activeMode.release('vinyl')));
         expect(device.mode.deck.touch, repatch(side.toggle));
         
         // Reset circle lights
-        Bar(device.slider.circle.meter)(0);            Bar(device.slider.left.meter)(0);
+        Bar(device.slider.circle.meter)(0);
+        Bar(device.slider.left.meter)(0);
         Bar(device.slider.middle.meter)(0);
         Bar(device.slider.right.meter)(0);
         
