@@ -1,5 +1,3 @@
-// Issues
-// Turn off lights on shutdown
 
 // Useful tinkering commands, channel reset and flat mode
 // amidi -p hw:1 -S F00001600200F7
@@ -1124,10 +1122,19 @@ StantonSCS3d.Agent = function(device) {
         },
         receive: comm.receive,
         stop: function() {
-            if (timer) engine.stopTimer(timer);
-            clear();
-            tell(device.lightsoff);
-            send(device.logo.on, true);
+            // No need for stopTimer() because it's done automatically
+            
+            // Forget all mods
+            comm.clear();
+            
+            // Send off-message to all light addresses 
+            var i = 0;
+            for (; i < 0x80; i++) {
+                print(i);
+                tell([0x90, i, 0]);
+            }
+            tell(device.logo.on); // Turn the logo back on
+            comm.tick(); // The last tick, causes sending of messages
         }
     }
 }
