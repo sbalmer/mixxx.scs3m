@@ -1,6 +1,5 @@
 // Issues
 // Turn off lights on shutdown
-// Stuck play (maybe caused by using hotcue when not playing)
 
 // Useful tinkering commands, channel reset and flat mode
 // amidi -p hw:1 -S F00001600200F7
