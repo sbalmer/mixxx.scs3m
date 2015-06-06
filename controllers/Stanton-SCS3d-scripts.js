@@ -6,7 +6,7 @@
 StantonSCS3d = {};
 
 StantonSCS3d.init = function(id) {
-    this.device = this.Device(0);
+    this.device = this.Device();
     this.agent = this.Agent(this.device);
     this.agent.start();
 }
