@@ -536,6 +536,12 @@ StantonSCS3d.Agent = function(device) {
         }
     }
     
+    // Create a function that returns a constat value
+    var constant = function(val) {
+        var constant = val;
+        return function() { return constant; }
+    }
+    
     // Light leds in the circle according to pattern
     // Pattern is a two-dimensional array 3 x 7 of bools
     function centerlights(pattern, rate) {
@@ -549,7 +555,7 @@ StantonSCS3d.Agent = function(device) {
                     // It moves!
                     comm.mask([light[0], light[1]], Blinker(rate, pat), true);
                 } else {
-                    tell([light[0], light[1], pat]);
+                    comm.mask([light[0], light[1]], constant(pat), false);
                 }
             }
         }
@@ -1015,6 +1021,30 @@ StantonSCS3d.Agent = function(device) {
 
         expect(device.slider.circle.slide.rel, function(value) {
             engine.setValue('[Playlist]', 'SelectTrackKnob', (value - 64));
+        });
+        
+        watch(channel, 'play', function(play) {
+            if (play) {
+                centerlights([
+                    [1,1,1],
+                    [0,1,0],
+                    [0,1,0],
+                    [0,1,0],
+                    [0,1,0],
+                    [0,1,0],
+                    [0,1,0]
+                ], 1);
+            } else {
+                centerlights([
+                    [0,[1,1,1,1,1,1,0,1],0],
+                    [1,[1,1,1,1,0,0,1,1],1],
+                    [1,[1,1,1,0,0,1,1,1],1],
+                    [0,[1,1,0,0,1,1,1,1],0],
+                    [0,[1,0,0,1,1,1,1,1],0],
+                    [0,[0,0,1,1,1,1,1,1],0],
+                    [0,[0,1,1,1,1,1,1,1],0]
+                ], 1);
+            }
         });
     }
 
