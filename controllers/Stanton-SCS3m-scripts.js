@@ -440,6 +440,12 @@ StantonSCS3m.Agent = function(device) {
     function Switch() {
         var engaged = false;
         return {
+            'change': function(state) {
+                state = !!(state);
+                var changed = engaged !== state;
+                engaged = state;
+                return changed;
+            },
             'engage': function() { engaged = true; },
             'cancel': function() { engaged = false; },
             'toggle': function() { engaged = !engaged; },
@@ -712,6 +718,11 @@ StantonSCS3m.Agent = function(device) {
                 | deck.left.engaged() // left side is in bit one
                 | deck.right.engaged() << 1 // right side bit two
         );
+        watch('[PreviewDeck1]', 'quantize', function(deckState) {
+            var changed = deck.left.change(deckState & 1)
+                       || deck.right.change(deckState & 2);
+            if (changed) repatch(function() {})();
+        });
     }
     
     function throttle() {

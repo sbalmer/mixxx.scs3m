@@ -1009,7 +1009,10 @@ StantonSCS3d.Agent = function(device) {
         
     /* Patch the circle for library browsing
      * Touching the center bar loads the highlighted track into the deck.
-     * Sliding om the circle changes the highlighted track up or down. 
+     * Sliding om the circle changes the highlighted track up or down.
+     * 
+     * Holding the deck button allows changing the active deck by pressing
+     * one of the four buttons around the circle.
      */
     function deckpatch(channel, held) {
         comm.sysex(device.modeset.circle);
@@ -1018,7 +1021,21 @@ StantonSCS3d.Agent = function(device) {
             var setDeck = function(newDeck) {
                 return function() {
                     var changed = deck !== newDeck;
-                    deck = newDeck;
+                    if (changed) {
+                        deck = newDeck;
+
+                        // see gleanChannel() for what we're doing here
+                        var deckState = engine.getValue('[PreviewDeck1]', 'quantize');
+                        if (deckState & 0x4) {
+                            var side = deck & 1;
+                            var altBit = 1 << side;
+                            var alt = !!(deck & 2);
+
+                            // shit gives me headaches, so I'm going to leave it like this
+                            deckState = (deckState & ~altBit) | (alt << side);
+                            engine.setValue('[PreviewDeck1]', 'quantize', deckState);
+                        }
+                    }
                     return changed;
                 }
             }
