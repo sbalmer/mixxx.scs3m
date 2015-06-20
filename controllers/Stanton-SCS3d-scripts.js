@@ -699,89 +699,95 @@ StantonSCS3d.Agent = function(device) {
         }
     }
     
-    function Modeswitch(presetMode, presetPatches) {
-        var mode = presetMode;
-        var patches = presetPatches;
-        var engaged = patches[0];
-        var held = false;
-        var lastHold = 0;
-        var cycleOnRelease = false;
-        return {
-            hold: function(newMode, newPatches) {
-                return function() {
-                    held = true;
-                    lastHold = new Date().getTime();
+    function Modeswitch(presetMode, modePatches) {
+        var engagedMode = presetMode;
+        var engagedPatch = modePatches[engagedMode][0];
+        var engaged = {};
+        engaged[presetMode] = engagedPatch;
 
-                    var cycle = mode === newMode;
-                    cycleOnRelease = cycle;
-                    if (!cycle) {
-                        mode = newMode;
-                        patches = newPatches;
-                        engaged = patches[0];
-                    }
+        var heldMode = false;
+        var heldPatch = false;
+        var lastHold = 0;
+
+        return {
+            hold: function(newHeldMode) {
+                return function() {
+                    heldMode = newHeldMode;
+                    heldPatch = engaged[heldMode];
+                    if (!heldPatch) heldPatch = modePatches[heldMode][0];
+
+                    lastHold = new Date().getTime();
                     return true;
                 };
             },
-            held: function() {
-                return held;
-            },
             release: function(releasedMode) {
                 return function() {
-                    if (releasedMode === mode || releasedMode === true) {
-                        held = false;
-                        if (
-                            cycleOnRelease
-                         && new Date().getTime() - lastHold < 200
-                        ) {
-                            engaged = patches[(patches.indexOf(engaged) + 1) % patches.length];
+                    if (releasedMode === heldMode || releasedMode === true) {
+                        if (new Date().getTime() - lastHold < 200) {
+                            // The button was just touched, not held
+                            var patches = modePatches[heldMode];
+                            if (engagedMode === heldMode) {
+                                // Cycle to the next patch
+                                engagedPatch = patches[(patches.indexOf(engagedPatch) + 1) % patches.length];
+                            } else {
+                                // Switch to the mode
+                                engagedMode = heldMode;
+                                engagedPatch = heldPatch;
+                                engaged[heldMode] = heldPatch;
+                            }
                         }
-                        return true;
                     }
+                    heldMode = false;
+                    heldPatch = false;
+                    return true;
                 };
             },
-            engaged: function() { return engaged; }
+            held: function() {  return heldMode; },
+            engaged: function() { return engagedMode; },
+            active: function() { return heldPatch || engagedPatch; }
         }
     }
+    
+    // The current deck
+    // Deck 1: 0b00
+    // Deck 2: 0b01
+    // Deck 3: 0b10
+    // Deck 4: 0b11
+    var deck = 0; // Deck 1 is preset
 
-    // mode for each channel
-    var mode = {
-        1: Modeswitch('vinyl', [vinylpatch, librarypatch]),
-        2: Modeswitch('vinyl', [vinylpatch, librarypatch]),
-        3: Modeswitch('vinyl', [vinylpatch, librarypatch]),
-        4: Modeswitch('vinyl', [vinylpatch, librarypatch])
-    }
-    
-
-    // left: false
-    // right: true
-    
-    // What side we're on
-    var side = Switch();
-    
-    // What channel is selected on either side
-    var activeChannel = [
-        Switch(), // Selected channel on the left (1 or 3)
-        Switch()  // Selected channel on the right (2 or 4)
-    ];
-    
     // Glean current channels from control value
     function gleanChannel(value) {
-        // Changed must be set to true if the deck was changed on the current side
+        var readDeck;
         var changed = false;
-        
+
         // check third bit and proceed if it's set
         // otherwise the control is assumed not to carry deck information
         if (value & 0x4) {
-            changed = 
-                   activeChannel[0].change(value & 0x1) && !side.engaged() // Left side carried in first bit
-                || activeChannel[1].change(value & 0x2) && side.engaged(); // Right side in second bit
+            // I don't often get the pleasure to work with bits
+            // Sure a simple if() cluster would be more clear
+
+            // Get side we're on (1 == right)
+            var side = deck & 1;
+            
+            // Which bit to read (read bit 2 for right)
+            var altBit = 1 << side;
+            
+            // Whether the main or the alt deck is selected on the SCS3M
+            var alt = !!(value & altBit);
+            
+            // construct new deck value
+            var newDeck = side | alt << 1;
+            
+            changed = newDeck !== deck;
+            deck = newDeck;
         }
+
         if (changed) {
             // Prevent stuck mode buttons on deck switch
+            mode[0].release(true);
             mode[1].release(true);
             mode[2].release(true);
             mode[3].release(true);
-            mode[4].release(true);
         }
         return changed;
     }
@@ -872,11 +878,6 @@ StantonSCS3d.Agent = function(device) {
             }
         }
     }
-
-    looppatches = [
-        LoopPatch(false),
-        LoopPatch(true)
-    ];
     
     // Keep track of hotcue to reset on layout changes or when another hotcue 
     // becomes active.
@@ -949,12 +950,6 @@ StantonSCS3d.Agent = function(device) {
         }
     }
 
-    var trigpatches = [
-        Trigpatch(0),
-        Trigpatch(1),
-        Trigpatch(2)
-    ];
-
     var resetTempRate = false;
     
     /* Patch the circle for beatmatching.
@@ -963,7 +958,6 @@ StantonSCS3d.Agent = function(device) {
      */
     function vinylpatch(channel) {
         comm.sysex(device.modeset.circle);
-        tell(device.mode.vinyl.light.red);
 
         var reset = function() {
             engine.setParameter(channel, 'rate_temp_down', false);
@@ -996,15 +990,47 @@ StantonSCS3d.Agent = function(device) {
             engine.setParameter(channel, 'jog', (value - 64));
         });
     }
-    
+        
         
     /* Patch the circle for library browsing
      * Touching the center bar loads the highlighted track into the deck.
-     * Sliding om the circle changes the highlighted track up or down. 
+     * Sliding om the circle changes the highlighted track up or down.
+     * 
+     * Holding the deck button allows changing the active deck by pressing
+     * one of the four buttons around the circle.
      */
-    function librarypatch(channel) {
+    function deckpatch(channel, held) {
         comm.sysex(device.modeset.circle);
-        tell(device.mode.vinyl.light.purple);
+        if (held) {
+            tell(device.mode.deck.light.purple);
+            var setDeck = function(newDeck) {
+                return function() {
+                    var changed = deck !== newDeck;
+                    if (changed) {
+                        deck = newDeck;
+
+                        // see gleanChannel() for what we're doing here
+                        var deckState = engine.getValue('[PreviewDeck1]', 'quantize');
+                        if (deckState & 0x4) {
+                            var side = deck & 1;
+                            var altBit = 1 << side;
+                            var alt = !!(deck & 2);
+
+                            // shit gives me headaches, so I'm going to leave it like this
+                            deckState = (deckState & ~altBit) | (alt << side);
+                            engine.setValue('[PreviewDeck1]', 'quantize', deckState);
+                        }
+                    }
+                    return changed;
+                }
+            }
+            expect(device.top.left.touch,     repatch(setDeck(0)));
+            expect(device.top.right.touch,    repatch(setDeck(1)));
+            expect(device.bottom.left.touch,  repatch(setDeck(2)));
+            expect(device.bottom.right.touch, repatch(setDeck(3)));
+        } else {
+            tell(device.mode.deck.light.red);
+        }
         centerlights([
             [0,[1,1,1,1,1,1,0,1],0],
             [1,[1,1,1,1,0,0,1,1],1],
@@ -1048,23 +1074,35 @@ StantonSCS3d.Agent = function(device) {
         });
     }
 
-    function patchage() {
+    var modeMap = {
+        'fx': [fxpatch],
+        'eq': [eqpatch],
+        'loop': [LoopPatch(false), LoopPatch(true)],
+        'trig': [Trigpatch(0), Trigpatch(1), Trigpatch(2)],
+        'vinyl': [vinylpatch],
+        'deck': [deckpatch],
+    }
+    
 
-        // You win two insanity points if you don't properly misunderstand this
-        var channelno = activeChannel[side.choose(0, 1)].choose(side.choose(1, 2), side.choose(3, 4));
+    // mode for each channel
+    var mode = {
+        0: Modeswitch('vinyl', modeMap),
+        1: Modeswitch('vinyl', modeMap),
+        2: Modeswitch('vinyl', modeMap),
+        3: Modeswitch('vinyl', modeMap)
+    }
+
+
+    function patchage() {
+        var channelno = deck + 1;
         var channel = '[Channel'+channelno+']';
-        
-        // The logic for the deck light is as follows: Right is red (like with
-        // cinch signaling) and the alternative decks are blue.
-        //
-        //  Deck | Left     | Right
-        // -----------------------
-        //  Main | 1: black | 2: red
-        //  Alt  | 3: blue  | 4: purple
-        //
-        tell(device.mode.deck.light.bits(channelno-1));
-        tell(device.decklight[0](!activeChannel[side.choose(0, 1)].engaged()));
-        tell(device.decklight[1](activeChannel[side.choose(0, 1)].engaged()));
+        tell(device.top.left.light[deck == 0 ? 'red' : 'black']);
+        tell(device.top.right.light[deck == 1 ? 'red' : 'black']);
+        tell(device.bottom.left.light[deck == 2 ? 'red' : 'black']);
+        tell(device.bottom.right.light[deck == 3 ? 'red' : 'black']);
+
+        tell(device.decklight[0](!(deck & 1)));
+        tell(device.decklight[1](deck & 1));
 
 
         tell(device.logo.on);
@@ -1077,23 +1115,27 @@ StantonSCS3d.Agent = function(device) {
         if (resetRollingLoop) resetRollingLoop();
         if (resetHotcue) resetHotcue();
 
-        var activeMode = mode[channelno];
+        var activeMode = mode[deck];
         tell(device.mode.fx.light.black);
         tell(device.mode.eq.light.black);
         tell(device.mode.loop.light.black);
         tell(device.mode.trig.light.black);
         tell(device.mode.vinyl.light.black);
-        expect(device.mode.fx.touch,   repatch(activeMode.hold('fx', [fxpatch])));
+        tell(device.mode.deck.light.black);
+        tell(device.mode[activeMode.engaged()].light.red);
+        if (activeMode.held()) tell(device.mode[activeMode.held()].light.purple);
+        expect(device.mode.fx.touch,   repatch(activeMode.hold('fx')));
         expect(device.mode.fx.release, repatch(activeMode.release('fx')));
-        expect(device.mode.eq.touch,   repatch(activeMode.hold('eq', [eqpatch])));
+        expect(device.mode.eq.touch,   repatch(activeMode.hold('eq')));
         expect(device.mode.eq.release, repatch(activeMode.release('eq')));
-        expect(device.mode.loop.touch,   repatch(activeMode.hold('loop', looppatches)));
+        expect(device.mode.loop.touch,   repatch(activeMode.hold('loop')));
         expect(device.mode.loop.release, repatch(activeMode.release('loop')));
-        expect(device.mode.trig.touch,   repatch(activeMode.hold('trig', trigpatches)));
+        expect(device.mode.trig.touch,   repatch(activeMode.hold('trig')));
         expect(device.mode.trig.release, repatch(activeMode.release('trig')));
-        expect(device.mode.vinyl.touch,   repatch(activeMode.hold('vinyl', [vinylpatch, librarypatch])));
+        expect(device.mode.vinyl.touch,   repatch(activeMode.hold('vinyl')));
         expect(device.mode.vinyl.release, repatch(activeMode.release('vinyl')));
-        expect(device.mode.deck.touch, repatch(side.toggle));
+        expect(device.mode.deck.touch, repatch(activeMode.hold('deck')));
+        expect(device.mode.deck.release, repatch(activeMode.release('deck')));
         
         // Reset circle lights
         Bar(device.slider.circle.meter)(0);
@@ -1102,7 +1144,7 @@ StantonSCS3d.Agent = function(device) {
         Bar(device.slider.right.meter)(0);
         
         // Call the patch function that was put into the switch with cycle()
-        activeMode.engaged()(channel, activeMode.held());
+        activeMode.active()(channel, activeMode.held());
 
         expect(device.button.play.touch, toggle(channel, 'play'));
         watchmulti({
