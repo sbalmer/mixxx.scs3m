@@ -720,9 +720,6 @@ StantonSCS3d.Agent = function(device) {
                     return true;
                 };
             },
-            held: function() {
-                return !!heldMode;
-            },
             release: function(releasedMode) {
                 return function() {
                     if (releasedMode === heldMode || releasedMode === true) {
@@ -745,7 +742,9 @@ StantonSCS3d.Agent = function(device) {
                     return true;
                 };
             },
-            engaged: function() { return heldPatch || engagedPatch; }
+            held: function() {  return heldMode; },
+            engaged: function() { return engagedMode; },
+            active: function() { return heldPatch || engagedPatch; }
         }
     }
     
@@ -959,7 +958,6 @@ StantonSCS3d.Agent = function(device) {
      */
     function vinylpatch(channel) {
         comm.sysex(device.modeset.circle);
-        tell(device.mode.vinyl.light.red);
 
         var reset = function() {
             engine.setParameter(channel, 'rate_temp_down', false);
@@ -1123,6 +1121,9 @@ StantonSCS3d.Agent = function(device) {
         tell(device.mode.loop.light.black);
         tell(device.mode.trig.light.black);
         tell(device.mode.vinyl.light.black);
+        tell(device.mode.deck.light.black);
+        tell(device.mode[activeMode.engaged()].light.red);
+        if (activeMode.held()) tell(device.mode[activeMode.held()].light.purple);
         expect(device.mode.fx.touch,   repatch(activeMode.hold('fx')));
         expect(device.mode.fx.release, repatch(activeMode.release('fx')));
         expect(device.mode.eq.touch,   repatch(activeMode.hold('eq')));
@@ -1143,7 +1144,7 @@ StantonSCS3d.Agent = function(device) {
         Bar(device.slider.right.meter)(0);
         
         // Call the patch function that was put into the switch with cycle()
-        activeMode.engaged()(channel, activeMode.held());
+        activeMode.active()(channel, activeMode.held());
 
         expect(device.button.play.touch, toggle(channel, 'play'));
         watchmulti({
