@@ -1160,7 +1160,6 @@ StantonSCS3d.Agent = function(device) {
             // Send off-message to all light addresses 
             var i = 0;
             for (; i < 0x80; i++) {
-                print(i);
                 tell([0x90, i, 0]);
             }
             tell(device.logo.on); // Turn the logo back on
