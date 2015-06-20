@@ -699,56 +699,54 @@ StantonSCS3d.Agent = function(device) {
         }
     }
     
-    function Modeswitch(presetMode, presetPatches) {
-        var mode = presetMode;
-        var patches = presetPatches;
-        var engaged = patches[0];
-        var held = false;
-        var lastHold = 0;
-        var cycleOnRelease = false;
-        return {
-            hold: function(newMode, newPatches) {
-                return function() {
-                    held = true;
-                    lastHold = new Date().getTime();
+    function Modeswitch(presetMode, modePatches) {
+        var engagedMode = presetMode;
+        var engagedPatch = modePatches[engagedMode][0];
+        var engaged = {};
+        engaged[presetMode] = engagedPatch;
 
-                    var cycle = mode === newMode;
-                    cycleOnRelease = cycle;
-                    if (!cycle) {
-                        mode = newMode;
-                        patches = newPatches;
-                        engaged = patches[0];
-                    }
+        var heldMode = false;
+        var heldPatch = false;
+        var lastHold = 0;
+
+        return {
+            hold: function(newHeldMode) {
+                return function() {
+                    heldMode = newHeldMode;
+                    heldPatch = engaged[heldMode];
+                    if (!heldPatch) heldPatch = modePatches[heldMode][0];
+
+                    lastHold = new Date().getTime();
                     return true;
                 };
             },
             held: function() {
-                return held;
+                return !!heldMode;
             },
             release: function(releasedMode) {
                 return function() {
-                    if (releasedMode === mode || releasedMode === true) {
-                        held = false;
-                        if (
-                            cycleOnRelease
-                         && new Date().getTime() - lastHold < 200
-                        ) {
-                            engaged = patches[(patches.indexOf(engaged) + 1) % patches.length];
+                    if (releasedMode === heldMode || releasedMode === true) {
+                        if (new Date().getTime() - lastHold < 200) {
+                            // The button was just touched, not held
+                            var patches = modePatches[heldMode];
+                            if (engagedMode === heldMode) {
+                                // Cycle to the next patch
+                                engagedPatch = patches[(patches.indexOf(engagedPatch) + 1) % patches.length];
+                            } else {
+                                // Switch to the mode
+                                engagedMode = heldMode;
+                                engagedPatch = heldPatch;
+                                engaged[heldMode] = heldPatch;
+                            }
                         }
-                        return true;
                     }
+                    heldMode = false;
+                    heldPatch = false;
+                    return true;
                 };
             },
-            engaged: function() { return engaged; }
+            engaged: function() { return heldPatch || engagedPatch; }
         }
-    }
-
-    // mode for each channel
-    var mode = {
-        0: Modeswitch('vinyl', [vinylpatch]),
-        1: Modeswitch('vinyl', [vinylpatch]),
-        2: Modeswitch('vinyl', [vinylpatch]),
-        3: Modeswitch('vinyl', [vinylpatch])
     }
     
     // The current deck
@@ -881,11 +879,6 @@ StantonSCS3d.Agent = function(device) {
             }
         }
     }
-
-    looppatches = [
-        LoopPatch(false),
-        LoopPatch(true)
-    ];
     
     // Keep track of hotcue to reset on layout changes or when another hotcue 
     // becomes active.
@@ -957,12 +950,6 @@ StantonSCS3d.Agent = function(device) {
             }
         }
     }
-
-    var trigpatches = [
-        Trigpatch(0),
-        Trigpatch(1),
-        Trigpatch(2)
-    ];
 
     var resetTempRate = false;
     
@@ -1089,6 +1076,25 @@ StantonSCS3d.Agent = function(device) {
         });
     }
 
+    var modeMap = {
+        'fx': [fxpatch],
+        'eq': [eqpatch],
+        'loop': [LoopPatch(false), LoopPatch(true)],
+        'trig': [Trigpatch(0), Trigpatch(1), Trigpatch(2)],
+        'vinyl': [vinylpatch],
+        'deck': [deckpatch],
+    }
+    
+
+    // mode for each channel
+    var mode = {
+        0: Modeswitch('vinyl', modeMap),
+        1: Modeswitch('vinyl', modeMap),
+        2: Modeswitch('vinyl', modeMap),
+        3: Modeswitch('vinyl', modeMap)
+    }
+
+
     function patchage() {
         var channelno = deck + 1;
         var channel = '[Channel'+channelno+']';
@@ -1097,15 +1103,6 @@ StantonSCS3d.Agent = function(device) {
         tell(device.bottom.left.light[deck == 2 ? 'red' : 'black']);
         tell(device.bottom.right.light[deck == 3 ? 'red' : 'black']);
 
-        // The logic for the deck light is as follows: Right is red (like with
-        // cinch signaling) and the alternative decks are blue.
-        //
-        //  Deck | Left     | Right
-        // -----------------------
-        //  Main | 1: black | 2: red
-        //  Alt  | 3: blue  | 4: purple
-        //
-        tell(device.mode.deck.light.bits(channelno-1));
         tell(device.decklight[0](!(deck & 1)));
         tell(device.decklight[1](deck & 1));
 
@@ -1126,19 +1123,17 @@ StantonSCS3d.Agent = function(device) {
         tell(device.mode.loop.light.black);
         tell(device.mode.trig.light.black);
         tell(device.mode.vinyl.light.black);
-        expect(device.mode.fx.touch,   repatch(activeMode.hold('fx', [fxpatch])));
+        expect(device.mode.fx.touch,   repatch(activeMode.hold('fx')));
         expect(device.mode.fx.release, repatch(activeMode.release('fx')));
-        expect(device.mode.eq.touch,   repatch(activeMode.hold('eq', [eqpatch])));
+        expect(device.mode.eq.touch,   repatch(activeMode.hold('eq')));
         expect(device.mode.eq.release, repatch(activeMode.release('eq')));
-        expect(device.mode.loop.touch,   repatch(activeMode.hold('loop', looppatches)));
+        expect(device.mode.loop.touch,   repatch(activeMode.hold('loop')));
         expect(device.mode.loop.release, repatch(activeMode.release('loop')));
-        expect(device.mode.trig.touch,   repatch(activeMode.hold('trig', trigpatches)));
+        expect(device.mode.trig.touch,   repatch(activeMode.hold('trig')));
         expect(device.mode.trig.release, repatch(activeMode.release('trig')));
-
-        expect(device.mode.vinyl.touch,   repatch(activeMode.hold('vinyl', [vinylpatch])));
+        expect(device.mode.vinyl.touch,   repatch(activeMode.hold('vinyl')));
         expect(device.mode.vinyl.release, repatch(activeMode.release('vinyl')));
-
-        expect(device.mode.deck.touch, repatch(activeMode.hold('deck', [deckpatch])));
+        expect(device.mode.deck.touch, repatch(activeMode.hold('deck')));
         expect(device.mode.deck.release, repatch(activeMode.release('deck')));
         
         // Reset circle lights
