@@ -1030,6 +1030,10 @@ StantonSCS3d.Agent = function(device) {
             expect(device.bottom.right.touch, repatch(setDeck(3)));
         } else {
             tell(device.mode.deck.light.red);
+            expect(device.top.left.touch,     setConst('[Playlist]', 'SelectPrevPlaylist', 1));
+            expect(device.bottom.left.touch,  setConst('[Playlist]', 'SelectNextPlaylist', 1));
+            expect(device.top.right.touch,    setConst('[Playlist]', 'SelectPrevTrack', 1));
+            expect(device.bottom.right.touch, setConst('[Playlist]', 'SelectNextTrack', 1));
         }
 
         expect(device.slider.middle.release, function() { 
