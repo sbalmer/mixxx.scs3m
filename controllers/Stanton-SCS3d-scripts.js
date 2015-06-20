@@ -1031,15 +1031,6 @@ StantonSCS3d.Agent = function(device) {
         } else {
             tell(device.mode.deck.light.red);
         }
-        centerlights([
-            [0,[1,1,1,1,1,1,0,1],0],
-            [1,[1,1,1,1,0,0,1,1],1],
-            [0,[1,1,1,0,0,1,1,1],0],
-            [0,[1,1,0,0,1,1,1,1],0],
-            [0,[1,0,0,1,1,1,1,1],0],
-            [0,[0,0,1,1,1,1,1,1],0],
-            [0,[0,1,1,1,1,1,1,1],0]
-        ], 1);
 
         expect(device.slider.middle.release, function() { 
             engine.setValue(channel, 'LoadSelectedTrack', true);
