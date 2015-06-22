@@ -1117,10 +1117,10 @@ StantonSCS3d.Agent = function(device) {
 
     // mode for each channel
     var mode = {
-        0: MultiModeswitch('vinyl', modeMap),
-        1: MultiModeswitch('vinyl', modeMap),
-        2: MultiModeswitch('vinyl', modeMap),
-        3: MultiModeswitch('vinyl', modeMap)
+        0: MultiModeswitch('deck', modeMap),
+        1: MultiModeswitch('deck', modeMap),
+        2: MultiModeswitch('deck', modeMap),
+        3: MultiModeswitch('deck', modeMap)
     }
     
     // Setup a process that keeps sliding a control by a rate that can be changed
