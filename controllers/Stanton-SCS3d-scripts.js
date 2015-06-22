@@ -224,6 +224,9 @@ StantonSCS3d.Comm = function() {
     // Last sent SYSEX message
     var actual_sysex = [];
     
+    // List of functions to call on each tick
+    var repeats = [];
+    
     function send() {
         for (cid in dirty) {
             var message = base[cid];
@@ -270,8 +273,15 @@ StantonSCS3d.Comm = function() {
                 dirty[cid] = true;
             }
         },
-    
+
+        repeat: function(rep) {
+            repeats.push(rep);
+        },
+
         tick: function() {
+            for (i in repeats) {
+                repeats[i](ticks);
+            }
             for (cid in ticking) {
                 dirty[cid] = true;
             }
@@ -282,6 +292,7 @@ StantonSCS3d.Comm = function() {
         clear: function() {
             receivers = {};
             ticking = {};
+            repeats = [];
             for (cid in mask) {
                 dirty[cid] = true;
             }
