@@ -682,11 +682,12 @@ StantonSCS3d.Agent = function(device) {
     }
 
     // relative control
-    function budge(channel, control) {
+    function budge(channel, control, scale) {
+        length = 128 / (scale || 1);
         return function(offset) {
             engine.setValue(channel, control,
                 engine.getValue(channel, control)
-                + (offset-64)/128
+                + (offset-64)/length
             );
         }
     }
