@@ -718,7 +718,23 @@ StantonSCS3d.Agent = function(device) {
         }
     }
     
-    function Modeswitch(presetMode, modePatches) {
+    function Modeswitch(presetMode, patches) {
+        var engaged = presetMode;
+
+        return {
+            engage: function(newMode) {
+                return function() {
+                    if (engaged === newMode) return false;
+                    engaged = newMode;
+                    return true;
+                }
+            },
+            engaged: function() { return engaged; },
+            patch: function() { return patches[engaged]; }
+        }
+    }
+
+    function MultiModeswitch(presetMode, modePatches) {
         var engagedMode = presetMode;
         var engagedPatch = modePatches[engagedMode][0];
         var engaged = {};
@@ -975,7 +991,7 @@ StantonSCS3d.Agent = function(device) {
      * Sliding on the center bar will temporarily raise or lower the rate by a 
      * fixed amount. The circle slider functions as a slow jog wheel. 
      */
-    function vinylpatch(channel) {
+    function vinylpatch(channel, held) {
         comm.sysex(device.modeset.circle);
 
         var reset = function() {
@@ -1100,12 +1116,78 @@ StantonSCS3d.Agent = function(device) {
 
     // mode for each channel
     var mode = {
-        0: Modeswitch('vinyl', modeMap),
-        1: Modeswitch('vinyl', modeMap),
-        2: Modeswitch('vinyl', modeMap),
-        3: Modeswitch('vinyl', modeMap)
+        0: MultiModeswitch('vinyl', modeMap),
+        1: MultiModeswitch('vinyl', modeMap),
+        2: MultiModeswitch('vinyl', modeMap),
+        3: MultiModeswitch('vinyl', modeMap)
     }
+    
+    // Setup a process that keeps sliding a control by a rate that can be changed
+    var Sliding = function(channel, control) {
+        var slidingRate = 0;
+        var budge = function() {
+            if (slidingRate != 0) {
+                engine.setValue(channel, control,
+                    engine.getValue(channel, control)
+                    + slidingRate
+                );
+            }
+        }
+        comm.repeat(budge);
+        return function(newVal) {
+            var initial = slidingRate === 0;
+            slidingRate = newVal;
+            if (initial) budge();
+            
+        }
+    }
+    
+    var pitchModeMap = {
+        rate: function(channel) {
+            tell(device.pitch.light.red.on);
+            tell(device.pitch.light.blue.off);
+            var setRate = Sliding(channel, 'rate');
+            expect(device.pitch.slide.abs, function(value) { 
+                var rate = (value - 63) / 32;
+                var sign = rate > 0 ? 1 : -1;
+                setRate(
+                    sign
+                    * 0.01
+                    * Math.pow(Math.abs(rate), 3)
+                );
+            });
+            expect(device.pitch.release, function(value) { 
+                setRate(0);
+            });
+            watch(channel, 'rate', Centerbar(device.pitch.meter));
+        },
+        absrate: function(channel) {
+            tell(device.pitch.light.red.on);
+            tell(device.pitch.light.blue.on);
+            expect(device.pitch.slide.abs, set(channel, 'rate'));
+            watch(channel, 'rate', Centerbar(device.pitch.meter));
+        },
+        pitch: function(channel) {
+            tell(device.pitch.light.red.off);
+            tell(device.pitch.light.blue.on);
+            expect(device.pitch.slide.rel, budge(channel, 'pitch'));
+            watch(channel, 'pitch', Centerbar(device.pitch.meter));
+        },
+        abspitch: function(channel) {
+            tell(device.pitch.light.red.off);
+            tell(device.pitch.light.blue.off);
+            expect(device.pitch.slide.abs, set(channel, 'pitch'));
+            watch(channel, 'pitch', Centerbar(device.pitch.meter));
+        }
+    };
 
+    // pitch slider mode per channel
+    var pitchMode = {
+        0: Modeswitch('rate', pitchModeMap),
+        1: Modeswitch('rate', pitchModeMap),
+        2: Modeswitch('rate', pitchModeMap),
+        3: Modeswitch('rate', pitchModeMap)
+    }
 
     function patchage() {
         var channelno = deck + 1;
@@ -1122,14 +1204,36 @@ StantonSCS3d.Agent = function(device) {
         tell(device.logo.on);
 
         expect(device.gain.slide.abs, set(channel, 'volume'));
-
         watch(channel, 'volume', Bar(device.gain.meter));
+
 
         if (resetTempRate) resetTempRate();
         if (resetRollingLoop) resetRollingLoop();
         if (resetHotcue) resetHotcue();
 
         var activeMode = mode[deck];
+        
+        var activePitchMode = pitchMode[deck];
+        
+        if (activeMode.held() === 'vinyl') {
+            expect(device.top.left.touch,     repatch(activePitchMode.engage('rate')));
+            expect(device.top.right.touch,    repatch(activePitchMode.engage('pitch')));
+            expect(device.bottom.left.touch,  repatch(activePitchMode.engage('absrate')));
+            expect(device.bottom.right.touch, repatch(activePitchMode.engage('abspitch')));
+
+            expect(device.pitch.slide.abs, function() {
+                var am = activePitchMode.engaged();
+                if (am == 'rate' || am == 'absrate') {
+                    reset(channel, 'rate')();
+                } else {
+                    reset(channel, 'pitch')();
+                }
+            });
+        } else {
+            activePitchMode.patch()(channel);
+        }
+        
+        
         tell(device.mode.fx.light.black);
         tell(device.mode.eq.light.black);
         tell(device.mode.loop.light.black);
