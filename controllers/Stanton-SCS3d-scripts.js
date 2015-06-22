@@ -1,7 +1,7 @@
 
 // Useful tinkering commands, channel reset and flat mode
 // amidi -p hw:1 -S F00001600200F7
-// amidi -p hw:1 -S F07E000601F7
+// amidi -p hw:1 -S F00001601000F7
 
 StantonSCS3d = {};
 
