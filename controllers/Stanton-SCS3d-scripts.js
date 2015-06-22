@@ -842,16 +842,17 @@ StantonSCS3d.Agent = function(device) {
         // Dunno what to do here
     }
 
-    function eqpatch(channel) {
+    function eqpatch(channel, held) {
         comm.sysex(device.modeset.slider);
         tell(device.mode.eq.light.red);
         watch(channel, 'filterLow', Centerbar(device.slider.left.meter)); 
         watch(channel, 'filterMid', Centerbar(device.slider.middle.meter)); 
         watch(channel, 'filterHigh', Centerbar(device.slider.right.meter));
         
-        expect(device.slider.left.slide.abs, set(channel, 'filterLow'));
-        expect(device.slider.middle.slide.abs, set(channel, 'filterMid'));
-        expect(device.slider.right.slide.abs, set(channel, 'filterHigh'));
+        var op = held ? reset : set;
+        expect(device.slider.left.slide.abs, op(channel, 'filterLow'));
+        expect(device.slider.middle.slide.abs, op(channel, 'filterMid'));
+        expect(device.slider.right.slide.abs, op(channel, 'filterHigh'));
     }
 
 
