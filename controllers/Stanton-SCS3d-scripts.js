@@ -1143,41 +1143,61 @@ StantonSCS3d.Agent = function(device) {
     }
     
     var pitchModeMap = {
-        rate: function(channel) {
+        rate: function(channel, held) {
             tell(device.pitch.light.red.on);
             tell(device.pitch.light.blue.off);
-            var setRate = Sliding(channel, 'rate');
-            expect(device.pitch.slide.abs, function(value) { 
-                var rate = (value - 63) / 32;
-                var sign = rate > 0 ? 1 : -1;
-                setRate(
-                    sign
-                    * 0.01
-                    * Math.pow(Math.abs(rate), 3)
-                );
-            });
-            expect(device.pitch.release, function(value) { 
-                setRate(0);
-            });
             watch(channel, 'rate', Centerbar(device.pitch.meter));
+
+            if (held) {
+                expect(device.pitch.slide.abs, reset(channel, 'rate'));
+            } else {
+                var setRate = Sliding(channel, 'rate');
+                expect(device.pitch.slide.abs, function(value) { 
+                    var rate = (value - 63) / 32;
+                    var sign = rate > 0 ? 1 : -1;
+                    setRate(
+                        sign
+                        * 0.01
+                        * Math.pow(Math.abs(rate), 3)
+                    );
+                });
+                expect(device.pitch.release, function(value) { 
+                    setRate(0);
+                });
+            }
         },
-        absrate: function(channel) {
+        absrate: function(channel, held) {
             tell(device.pitch.light.red.on);
             tell(device.pitch.light.blue.on);
-            expect(device.pitch.slide.abs, set(channel, 'rate'));
             watch(channel, 'rate', Centerbar(device.pitch.meter));
+
+            if (held) {
+                expect(device.pitch.slide.abs, reset(channel, 'rate'));
+            } else {
+                expect(device.pitch.slide.abs, set(channel, 'rate'));
+            }
         },
-        pitch: function(channel) {
+        pitch: function(channel, held) {
             tell(device.pitch.light.red.off);
             tell(device.pitch.light.blue.on);
-            expect(device.pitch.slide.rel, budge(channel, 'pitch'));
             watch(channel, 'pitch', Centerbar(device.pitch.meter));
+
+            if (held) {
+                expect(device.pitch.slide.rel, reset(channel, 'pitch'));
+            } else {
+                expect(device.pitch.slide.rel, budge(channel, 'pitch'));
+            }
         },
-        abspitch: function(channel) {
+        abspitch: function(channel, held) {
             tell(device.pitch.light.red.off);
             tell(device.pitch.light.blue.off);
-            expect(device.pitch.slide.abs, set(channel, 'pitch'));
             watch(channel, 'pitch', Centerbar(device.pitch.meter));
+
+            if (held) {
+                expect(device.pitch.slide.rel, reset(channel, 'pitch'));
+            } else {
+                expect(device.pitch.slide.abs, set(channel, 'pitch'));
+            }
         }
     };
 
@@ -1214,24 +1234,15 @@ StantonSCS3d.Agent = function(device) {
         var activeMode = mode[deck];
         
         var activePitchMode = pitchMode[deck];
-        
-        if (activeMode.held() === 'vinyl') {
+        var vinylHeld = activeMode.held() === 'vinyl';
+        activePitchMode.patch()(channel, vinylHeld);
+        if (vinylHeld) {
             expect(device.top.left.touch,     repatch(activePitchMode.engage('rate')));
             expect(device.top.right.touch,    repatch(activePitchMode.engage('pitch')));
             expect(device.bottom.left.touch,  repatch(activePitchMode.engage('absrate')));
             expect(device.bottom.right.touch, repatch(activePitchMode.engage('abspitch')));
-
-            expect(device.pitch.slide.abs, function() {
-                var am = activePitchMode.engaged();
-                if (am == 'rate' || am == 'absrate') {
-                    reset(channel, 'rate')();
-                } else {
-                    reset(channel, 'pitch')();
-                }
-            });
-        } else {
-            activePitchMode.patch()(channel);
         }
+        
         
         
         tell(device.mode.fx.light.black);
