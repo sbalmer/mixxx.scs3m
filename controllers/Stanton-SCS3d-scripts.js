@@ -1210,18 +1210,13 @@ StantonSCS3d.Agent = function(device) {
     }
 
     function patchage() {
+        tell(device.logo.on);
+
         var channelno = deck + 1;
         var channel = '[Channel'+channelno+']';
-        tell(device.top.left.light[deck == 0 ? 'red' : 'black']);
-        tell(device.top.right.light[deck == 1 ? 'red' : 'black']);
-        tell(device.bottom.left.light[deck == 2 ? 'red' : 'black']);
-        tell(device.bottom.right.light[deck == 3 ? 'red' : 'black']);
 
         tell(device.decklight[0](!(deck & 1)));
         tell(device.decklight[1](deck & 1));
-
-
-        tell(device.logo.on);
 
         expect(device.gain.slide.abs, set(channel, 'volume'));
         watch(channel, 'volume', Bar(device.gain.meter));
@@ -1237,14 +1232,25 @@ StantonSCS3d.Agent = function(device) {
         var vinylHeld = activeMode.held() === 'vinyl';
         activePitchMode.patch()(channel, vinylHeld);
         if (vinylHeld) {
-            expect(device.top.left.touch,     repatch(activePitchMode.engage('rate')));
-            expect(device.top.right.touch,    repatch(activePitchMode.engage('pitch')));
-            expect(device.bottom.left.touch,  repatch(activePitchMode.engage('absrate')));
-            expect(device.bottom.right.touch, repatch(activePitchMode.engage('abspitch')));
+            var engagedMode = activePitchMode.engaged();
+            var pitchButtons = {
+                'rate': device.top.left,
+                'pitch': device.top.right,
+                'absrate': device.bottom.left,
+                'abspitch': device.bottom.right,
+            }
+            for (modeName in pitchButtons) {
+                var pitchButton = pitchButtons[modeName];
+                expect(pitchButton.touch, repatch(activePitchMode.engage(modeName)));
+                tell(pitchButton.light[engagedMode === modeName ? 'blue' : 'black']);
+            }
+        } else {
+            tell(device.top.left.light[deck == 0 ? 'red' : 'black']);
+            tell(device.top.right.light[deck == 1 ? 'red' : 'black']);
+            tell(device.bottom.left.light[deck == 2 ? 'red' : 'black']);
+            tell(device.bottom.right.light[deck == 3 ? 'red' : 'black']);
         }
-        
-        
-        
+
         tell(device.mode.fx.light.black);
         tell(device.mode.eq.light.black);
         tell(device.mode.loop.light.black);
