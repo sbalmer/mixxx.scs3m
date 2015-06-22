@@ -75,10 +75,17 @@ StantonSCS3d.Device = function() {
             release: [NoteOff, id]
         }
     }
-    
-    function LightedSlider(id, meterid, lights) {
+
+    function LightSlider(id, meterid, lights) {
         var slider = Slider(id, meterid, lights);
-        slider.light = Light(meterid-2);
+        var redled = meterid-2;
+        var blueled = meterid-1;
+        
+        // Contrary to the other lights, the pitch light as separate addresses for red and blue
+        slider.light = {
+            red: { on: [NoteOn, redled, 1], off: [NoteOn, redled, 0] },
+            blue: { on: [NoteOn, blueled, 1], off: [NoteOn, blueled, 0] }
+        }
         return slider;
     }
 
@@ -127,8 +134,8 @@ StantonSCS3d.Device = function() {
             Decklight(0x71), // A
             Decklight(0x72)  // B
         ],
-        gain: LightedSlider(0x07, 0x34, 9),
-        pitch: LightedSlider(0x03, 0x3F, 9),
+        gain: Slider(0x07, 0x34, 9),
+        pitch: LightSlider(0x03, 0x3F, 9),
         mode: {
             fx: Touch(0x20),
             loop: Touch(0x22),
