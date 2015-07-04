@@ -1,7 +1,8 @@
 "use strict";
 
 // issues:
-// - filterHigh/Mid/Low is deprecated, what is the replacement? 
+// - filterHigh/Mid/Low is deprecated, what is the replacement?
+// - On FX-EQ, gain should reset pregain, crossfader should drop needle at beginning of track
 
 // manually test messages
 // amidi -p hw:1 -S F00001601501F7 # flat mode
