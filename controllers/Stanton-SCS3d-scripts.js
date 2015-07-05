@@ -512,7 +512,8 @@ StantonSCS3d.Agent = function(device) {
             var i = 0;
             for (; i <= range; i++) {
                 var light = lights[i];
-                tell([light[0], light[1], i == pos]);
+				var on = i == pos;
+                tell([light[0], light[1], +on]);
             }
         }
     }
@@ -529,7 +530,8 @@ StantonSCS3d.Agent = function(device) {
             var i = 0;
             for (; i < count; i++) {
                 var light = lights[i];
-                tell([light[0], light[1], i >= left && i <= right]);
+				var on = i >= left && i <= right;
+                tell([light[0], light[1], +on]);
             }
         }
     }
@@ -549,7 +551,8 @@ StantonSCS3d.Agent = function(device) {
             var i = 0;
             for (; i < lights.length; i++) {
                 var light = lights[i];
-                tell([light[0], light[1], i <= pos]);
+				var on = i <= pos;
+                tell([light[0], light[1], +on]);
             }
         }
     }
