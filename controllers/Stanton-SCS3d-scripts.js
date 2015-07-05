@@ -740,6 +740,8 @@ StantonSCS3d.Agent = function(device) {
     function MultiModeswitch(presetMode, modePatches) {
         var engagedMode = presetMode;
         var engagedPatch = modePatches[engagedMode][0];
+
+		// For every mode, keep the patch that was engaged last
         var engaged = {};
         engaged[presetMode] = engagedPatch;
 
@@ -767,6 +769,7 @@ StantonSCS3d.Agent = function(device) {
                             if (engagedMode === heldMode) {
                                 // Cycle to the next patch
                                 engagedPatch = patches[(patches.indexOf(engagedPatch) + 1) % patches.length];
+								engaged[heldMode] = engagedPatch;
                             } else {
                                 // Switch to the mode
                                 engagedMode = heldMode;
