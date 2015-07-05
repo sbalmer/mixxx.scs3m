@@ -2,6 +2,8 @@
 
 // issues:
 // - filterHigh/Mid/Low is deprecated, what is the replacement? 
+// - blink EQ when not zeroed?
+// - blink FX when one is engaged?
 
 // manually test messages
 // amidi -p hw:1 -S F00001601501F7 # flat mode
