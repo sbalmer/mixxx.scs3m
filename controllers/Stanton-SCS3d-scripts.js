@@ -618,7 +618,8 @@ StantonSCS3d.Agent = function(device) {
             var rounds = seconds / 1.8;
             
             // Fractional part is needle's position in the circle
-            var needle = rounds % 1;
+			// Light addressing starts bottom left, add offset so it starts at top like the spinnies
+            var needle = (rounds + 0.5) % 1;
 
             var lights = device.slider.circle.meter;
             var count = lights.length;
