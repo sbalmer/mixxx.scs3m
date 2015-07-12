@@ -518,7 +518,8 @@ StantonSCS3d.Agent = function(device) {
             var i = 0;
             for (; i <= range; i++) {
                 var light = lights[i];
-                tell([light[0], light[1], i == pos]);
+				var on = i == pos;
+                tell([light[0], light[1], +on]);
             }
         }
     }
@@ -535,7 +536,8 @@ StantonSCS3d.Agent = function(device) {
             var i = 0;
             for (; i < count; i++) {
                 var light = lights[i];
-                tell([light[0], light[1], i >= left && i <= right]);
+				var on = i >= left && i <= right;
+                tell([light[0], light[1], +on]);
             }
         }
     }
@@ -555,7 +557,8 @@ StantonSCS3d.Agent = function(device) {
             var i = 0;
             for (; i < lights.length; i++) {
                 var light = lights[i];
-                tell([light[0], light[1], i <= pos]);
+				var on = i <= pos;
+                tell([light[0], light[1], +on]);
             }
         }
     }
@@ -621,7 +624,8 @@ StantonSCS3d.Agent = function(device) {
             var rounds = seconds / 1.8;
             
             // Fractional part is needle's position in the circle
-            var needle = rounds % 1;
+			// Light addressing starts bottom left, add offset so it starts at top like the spinnies
+            var needle = (rounds + 0.5) % 1;
 
             var lights = device.slider.circle.meter;
             var count = lights.length;
@@ -743,6 +747,8 @@ StantonSCS3d.Agent = function(device) {
     function MultiModeswitch(presetMode, modePatches) {
         var engagedMode = presetMode;
         var engagedPatch = modePatches[engagedMode][0];
+
+		// For every mode, keep the patch that was engaged last
         var engaged = {};
         engaged[presetMode] = engagedPatch;
 
@@ -770,6 +776,7 @@ StantonSCS3d.Agent = function(device) {
                             if (engagedMode === heldMode) {
                                 // Cycle to the next patch
                                 engagedPatch = patches[(patches.indexOf(engagedPatch) + 1) % patches.length];
+								engaged[heldMode] = engagedPatch;
                             } else {
                                 // Switch to the mode
                                 engagedMode = heldMode;
