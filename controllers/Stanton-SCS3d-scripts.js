@@ -876,65 +876,63 @@ StantonSCS3d.Agent = function(device) {
         expect(device.slider.right.slide.abs, op(channel, 'filterHigh'));
     }
 
-
-    var resetRollingLoop = false;
-
     function LoopPatch(rolling) {
-        return function(channel) {
-            comm.sysex(device.modeset.circle);
-            tell(rolling ? device.mode.loop.light.blue : device.mode.loop.light.red);
+		return function(channel) {
+			Autocancel('rolling', function(engage, cancel) {
+				comm.sysex(device.modeset.circle);
+				tell(rolling ? device.mode.loop.light.blue : device.mode.loop.light.red);
 
-            // Available loop lengths are powers of two in the range [-5..6]
-            var lengths = [0.03125, 0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64];
-            expect(device.slider.circle.slide.abs, function(value) {
-                // Map to range [-63..64] where 0 is top center
-                var lr = ((value + 64) % 128 - 63);
-                
-                // Map the circle slider position to a loop length
-                var exp = Math.ceil(Math.max(-5, Math.min(6, lr / 8)));
-                var len = lengths[4 + exp]; // == Math.pow(2, exp);
+				// Available loop lengths are powers of two in the range [-5..6]
+				var lengths = [0.03125, 0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64];
+				expect(device.slider.circle.slide.abs, function(value) {
+					// Map to range [-63..64] where 0 is top center
+					var lr = ((value + 64) % 128 - 63);
 
-                if (rolling) {
-                    set(channel, 'beatlooproll_'+len+'_activate')(true);            
-                    resetRollingLoop = function() { 
-                        set(channel, 'reloop_exit')(1); 
-                        resetRollingLoop = false;
-                    };
-                } else {
-                    set(channel, 'beatloop_'+len+'_activate')(true);
-                }
-            });
+					// Map the circle slider position to a loop length
+					var exp = Math.ceil(Math.max(-5, Math.min(6, lr / 8)));
+					var len = lengths[4 + exp]; // == Math.pow(2, exp);
 
-            var engineControls = {};
-            lengths.forEach(function(len, index) {
-                engineControls[index] = [channel, 'beatloop_'+len+'_enabled'];
-            });
-            watchmulti(engineControls, function(values) {
-                var activeIndex = false;
-                lengths.forEach(function(len, index) {
-                    if (values[index]) activeIndex = index;
-                });
-                if (activeIndex === false) {
-                    // Turn off all lights
-                    Bar(device.slider.circle.meter)(0);
-                } else {
-                    Centerbar(device.slider.circle.meter)(
-                        (12.5 - activeIndex) / 16
-                    );
-                }
-            });
-            
-            if (rolling) {
-                expect(device.slider.circle.release, function(value) {
-                    if (resetRollingLoop) resetRollingLoop();
-                });
-            } else {
-                expect(device.slider.middle.release, function(value) {
-                    set(channel, 'reloop_exit')(1);
-                });
-            }
-        }
-    }
+					if (rolling) {
+						set(channel, 'beatlooproll_'+len+'_activate')(true);
+						engage();
+					} else {
+						set(channel, 'beatloop_'+len+'_activate')(true);
+					}
+				});
+
+				var engineControls = {};
+				lengths.forEach(function(len, index) {
+					engineControls[index] = [channel, 'beatloop_'+len+'_enabled'];
+				});
+				watchmulti(engineControls, function(values) {
+					var activeIndex = false;
+					lengths.forEach(function(len, index) {
+						if (values[index]) activeIndex = index;
+					});
+					if (activeIndex === false) {
+						// Turn off all lights
+						Bar(device.slider.circle.meter)(0);
+					} else {
+						Centerbar(device.slider.circle.meter)(
+							(12.5 - activeIndex) / 16
+						);
+					}
+				});
+
+				if (rolling) {
+					expect(device.slider.circle.release, function(value) {
+						cancel();
+					});
+				} else {
+					expect(device.slider.middle.release, function(value) {
+						cancel();
+					});
+				}
+			}, function() {
+				set(channel, 'reloop_exit')(1);
+			});
+		}
+	}
     
     // Keep track of hotcue to reset on layout changes or when another hotcue 
     // becomes active.
@@ -1007,8 +1005,6 @@ StantonSCS3d.Agent = function(device) {
         }
     }
 
-    var resetTempRate = false;
-
 	var autocancel = {};
 	function Autocancel(name, setup, cancel) {
 		var engage = function() { autocancel[name] = cancel; };
@@ -1025,21 +1021,16 @@ StantonSCS3d.Agent = function(device) {
     function vinylpatch(channel, held) {
         comm.sysex(device.modeset.circle);
 
-        var reset = function() {
+		Autocancel('temprate', function(engage, cancel) {
+			expect(device.slider.middle.slide.abs, function(value) {
+				engage();
+				engine.setParameter(channel, 'rate_temp_down', value < 63);
+				engine.setParameter(channel, 'rate_temp_up', value > 63);
+			});
+			expect(device.slider.middle.release, cancel);
+		}, function() {
             engine.setParameter(channel, 'rate_temp_down', false);
             engine.setParameter(channel, 'rate_temp_up', false);
-            resetTempRate = false;
-        };
-
-        var setTempRate = function(value) {
-            engine.setParameter(channel, 'rate_temp_down', value < 63);
-            engine.setParameter(channel, 'rate_temp_up', value > 63);
-            resetTempRate = reset;
-        }
-
-        expect(device.slider.middle.slide.abs, setTempRate);
-        expect(device.slider.middle.release, function() { 
-            if (resetTempRate) resetTempRate();
         });
 
         watchmulti({
@@ -1266,8 +1257,6 @@ StantonSCS3d.Agent = function(device) {
 			autocancel[name]();
 		}
 		autocancel = {};
-        if (resetTempRate) resetTempRate();
-        if (resetRollingLoop) resetRollingLoop();
         if (resetHotcue) resetHotcue();
 
         var activeMode = mode[deck];
