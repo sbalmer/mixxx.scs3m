@@ -312,6 +312,7 @@ StantonSCS3d.Comm = function() {
         expect: function(message, handler) {
 			if (!message || message.length < 2) print("ERROR: invalid message to expect: "+message);
             var cid = CID(message);
+			if (receivers[cid]) return; // Don't steal
             receivers[cid] = handler;
         },
         
