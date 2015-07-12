@@ -1048,6 +1048,9 @@ StantonSCS3d.Agent = function(device) {
             engine.setParameter(channel, 'jog', (value - 64));
         });
 
+		expect(device.top.left.touch, setConst(channel, 'beatjump_1_backward', 1));
+		expect(device.top.right.touch, setConst(channel, 'beatjump_1_forward', 1));
+
 		Autocancel('fast', function(engage, cancel) {
 			expect(device.bottom.left.touch, both(engage, setConst(channel, 'back', 1)));
 			expect(device.bottom.left.release, cancel);
