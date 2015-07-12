@@ -1030,6 +1030,11 @@ StantonSCS3d.Agent = function(device) {
         expect(device.slider.circle.slide.rel, function(value) {
             engine.setParameter(channel, 'jog', (value - 64));
         });
+
+        expect(device.bottom.left.touch, setConst(channel, 'back', 1));
+        expect(device.bottom.left.release, setConst(channel, 'back', 0));
+        expect(device.bottom.right.touch, setConst(channel, 'fwd', 1));
+        expect(device.bottom.right.release, setConst(channel, 'fwd', 0));
     }
         
         
