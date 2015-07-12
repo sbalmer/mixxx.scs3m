@@ -310,6 +310,7 @@ StantonSCS3d.Comm = function() {
         },
         
         expect: function(message, handler) {
+			if (!message || message.length < 2) print("ERROR: invalid message to expect: "+message);
             var cid = CID(message);
             receivers[cid] = handler;
         },
@@ -421,6 +422,10 @@ StantonSCS3d.Agent = function(device) {
     // -> hello,you
     function demux(action) {
         return function(message, nd) {
+			if (!message || message.length < 2) {
+				print("ERROR: demux over invalid message: "+message);
+				return false;
+			}
             var changed = false;
             if (message[1].length) {
                 var i;
