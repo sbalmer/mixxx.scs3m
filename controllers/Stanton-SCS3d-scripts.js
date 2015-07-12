@@ -1053,10 +1053,15 @@ StantonSCS3d.Agent = function(device) {
             engine.setParameter(channel, 'jog', (value - 64));
         });
 
-        expect(device.bottom.left.touch, setConst(channel, 'back', 1));
-        expect(device.bottom.left.release, setConst(channel, 'back', 0));
-        expect(device.bottom.right.touch, setConst(channel, 'fwd', 1));
-        expect(device.bottom.right.release, setConst(channel, 'fwd', 0));
+		Autocancel('fast', function(cancel) {
+			expect(device.bottom.left.touch, both(cancel, setConst(channel, 'back', 1)));
+			expect(device.bottom.left.release, cancel);
+			expect(device.bottom.right.touch, both(cancel, setConst(channel, 'fwd', 1)));
+			expect(device.bottom.right.release, cancel);
+		}, function() {
+			setConst(channel, 'back', 0)();
+			setConst(channel, 'fwd', 0)();
+		});
     }
         
         
