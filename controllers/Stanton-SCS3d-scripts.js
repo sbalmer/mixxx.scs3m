@@ -671,6 +671,14 @@ StantonSCS3d.Agent = function(device) {
     }
 
     // absolute control
+    function both(c1, c2) {
+		return function(value) {
+			c1(value);
+			c2(value);
+		}
+    }
+
+    // absolute control
     function set(channel, control) {
         return function(value) {
             engine.setParameter(channel, control,
@@ -1000,6 +1008,12 @@ StantonSCS3d.Agent = function(device) {
     }
 
     var resetTempRate = false;
+
+	var autocancel = {};
+	function Autocancel(name, setup, cancel) {
+		autocancel[name] = cancel;
+		setup(cancel);
+	}
     
     /* Patch the circle for beatmatching.
      * Sliding on the center bar will temporarily raise or lower the rate by a 
@@ -1240,7 +1254,10 @@ StantonSCS3d.Agent = function(device) {
         expect(device.gain.slide.abs, set(channel, 'volume'));
         watch(channel, 'volume', Bar(device.gain.meter));
 
-
+		for (name in autocancel) {
+			autocancel[name]();
+		}
+		autocancel = {};
         if (resetTempRate) resetTempRate();
         if (resetRollingLoop) resetRollingLoop();
         if (resetHotcue) resetHotcue();
