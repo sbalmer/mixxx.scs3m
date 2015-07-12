@@ -1010,6 +1010,7 @@ StantonSCS3d.Agent = function(device) {
 		var engage = function() { autocancel[name] = cancel; };
 		var cancelIfEngaged = function() {
 			if (autocancel[name]) autocancel[name]();
+			delete autocancel[name];
 		}
 		setup(engage, cancelIfEngaged);
 	}
