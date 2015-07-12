@@ -1011,8 +1011,11 @@ StantonSCS3d.Agent = function(device) {
 
 	var autocancel = {};
 	function Autocancel(name, setup, cancel) {
-		autocancel[name] = cancel;
-		setup(cancel);
+		var engage = function() { autocancel[name] = cancel; };
+		var cancelIfEngaged = function() {
+			if (autocancel[name]) autocancel[name]();
+		}
+		setup(engage, cancelIfEngaged);
 	}
     
     /* Patch the circle for beatmatching.
@@ -1053,10 +1056,10 @@ StantonSCS3d.Agent = function(device) {
             engine.setParameter(channel, 'jog', (value - 64));
         });
 
-		Autocancel('fast', function(cancel) {
-			expect(device.bottom.left.touch, both(cancel, setConst(channel, 'back', 1)));
+		Autocancel('fast', function(engage, cancel) {
+			expect(device.bottom.left.touch, both(engage, setConst(channel, 'back', 1)));
 			expect(device.bottom.left.release, cancel);
-			expect(device.bottom.right.touch, both(cancel, setConst(channel, 'fwd', 1)));
+			expect(device.bottom.right.touch, both(engage, setConst(channel, 'fwd', 1)));
 			expect(device.bottom.right.release, cancel);
 		}, function() {
 			setConst(channel, 'back', 0)();
