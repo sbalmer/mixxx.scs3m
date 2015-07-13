@@ -868,6 +868,7 @@ StantonSCS3d.Agent = function(device) {
 
 	var FxPatch = function(nr) {
 		return function(channel, held) {
+			var effectunit = '[EffectRack1_EffectUnit'+(nr+1)+']';
 			var effectunit_effect = '[EffectRack1_EffectUnit'+(nr+1)+'_Effect1]';
 			comm.sysex(device.modeset.slider);
 			watch(effectunit_effect, 'parameter1', Needle(device.slider.left.meter));
@@ -877,6 +878,11 @@ StantonSCS3d.Agent = function(device) {
 			expect(device.slider.middle.slide.abs, set(effectunit_effect, 'parameter2'));
 			expect(device.slider.right.slide.abs, set(effectunit_effect, 'parameter3'));
 
+			// Pitch slider controls wetness
+			tell(device.pitch.light.red.off);
+			tell(device.pitch.light.blue.off);
+			watch(effectunit, 'mix', Bar(device.pitch.meter));
+			expect(device.pitch.slide.abs, set(effectunit, 'mix'));
 
 			// Button light color:
 			// When effect is assigned to deck: blue
@@ -893,15 +899,15 @@ StantonSCS3d.Agent = function(device) {
 
 			for (i in buttons) {
 				var button = buttons[i];
-				var unit = (+i+1);
-				var effectunit = '[EffectRack1_EffectUnit'+unit+']';
+				var unit = (+i+1); // coerce i to num
+				var assigned_effectunit = '[EffectRack1_EffectUnit'+unit+']';
 				var effectunit_enable = 'group_'+channel+'_enable';
 				if (held) {
-					expect(button.touch, repatch(toggle(effectunit, effectunit_enable)));
-					watch(effectunit, effectunit_enable, fxlight(button.light, deck == i));
+					expect(button.touch, repatch(toggle(assigned_effectunit, effectunit_enable)));
+					watch(assigned_effectunit, effectunit_enable, fxlight(button.light, deck == i));
 				} else {
 					expect(button.touch, repatch(effectMode.engage(i)));
-					watch(effectunit, effectunit_enable, fxlight(button.light, nr == i));
+					watch(assigned_effectunit, effectunit_enable, fxlight(button.light, nr == i));
 				}
 			}
 		}
