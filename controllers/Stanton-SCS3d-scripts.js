@@ -857,15 +857,68 @@ StantonSCS3d.Agent = function(device) {
             }
         }
     }
-    
-    function fxpatch(channel) {
+
+	var buttons = [device.top.left, device.top.right, device.bottom.left, device.bottom.right];
+
+	var deckLights = function() {
+		for (i in buttons) {
+			tell(buttons[i].light[deck == i ? 'red' : 'black']);
+		}
+	}
+
+	var FxPatch = function(nr) {
+		return function(channel, held) {
+			var effectunit_effect = '[EffectRack1_EffectUnit'+(nr+1)+'_Effect1]';
+			comm.sysex(device.modeset.slider);
+			watch(effectunit_effect, 'parameter1', Needle(device.slider.left.meter));
+			watch(effectunit_effect, 'parameter2', Needle(device.slider.middle.meter));
+			watch(effectunit_effect, 'parameter3', Needle(device.slider.right.meter));
+			expect(device.slider.left.slide.abs, set(effectunit_effect, 'parameter1'));
+			expect(device.slider.middle.slide.abs, set(effectunit_effect, 'parameter2'));
+			expect(device.slider.right.slide.abs, set(effectunit_effect, 'parameter3'));
+
+
+			// Button light color:
+			// When effect is assigned to deck: blue
+			// When effect is the currently active: red
+			// May be both
+			var fxlight = function(light, buttonnr) {
+				return function(enabled) {
+					var active = nr == buttonnr;
+					var color = enabled
+						? (active ? 'purple' : 'blue')
+						: (active ? 'red' : 'black');
+					tell(light[color]);
+				}
+			}
+
+			for (i in buttons) {
+				var button = buttons[i];
+				var unit = (+i+1);
+				var effectunit = '[EffectRack1_EffectUnit'+unit+']';
+				var effectunit_enable = 'group_'+channel+'_enable';
+				if (held) {
+					expect(button.touch, repatch(toggle(effectunit, effectunit_enable)));
+				} else {
+					expect(button.touch, repatch(effectMode.engage(i)));
+				}
+				watch(effectunit, effectunit_enable, fxlight(button.light, i));
+			}
+		}
+	}
+
+    // Active effect mode
+    var effectMode = Modeswitch(0, [FxPatch(0), FxPatch(1), FxPatch(3), FxPatch(4)]);
+
+    function fxpatch(channel, held) {
         tell(device.mode.fx.light.red);
-        // Dunno what to do here
+		effectMode.patch()(channel, held);
     }
 
     function eqpatch(channel, held) {
         comm.sysex(device.modeset.slider);
         tell(device.mode.eq.light.red);
+		deckLights();
         watch(channel, 'filterLow', Centerbar(device.slider.left.meter)); 
         watch(channel, 'filterMid', Centerbar(device.slider.middle.meter)); 
         watch(channel, 'filterHigh', Centerbar(device.slider.right.meter));
@@ -881,6 +934,7 @@ StantonSCS3d.Agent = function(device) {
 			Autocancel('rolling', function(engage, cancel) {
 				comm.sysex(device.modeset.circle);
 				tell(rolling ? device.mode.loop.light.blue : device.mode.loop.light.red);
+				deckLights();
 
 				// Available loop lengths are powers of two in the range [-5..6]
 				var lengths = [0.03125, 0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64];
@@ -989,6 +1043,7 @@ StantonSCS3d.Agent = function(device) {
         return function(channel, held) {
             comm.sysex(device.modeset.button);
             tell(device.mode.trig.light.bits(trigset+1));
+			deckLights();
 
             var i = 0;
             var offset = trigset * 5;
@@ -1021,6 +1076,7 @@ StantonSCS3d.Agent = function(device) {
      */
     function vinylpatch(channel, held) {
         comm.sysex(device.modeset.circle);
+		deckLights();
 
 		Autocancel('temprate', function(engage, cancel) {
 			expect(device.slider.middle.slide.abs, function(value) {
@@ -1060,6 +1116,22 @@ StantonSCS3d.Agent = function(device) {
 			setConst(channel, 'back', 0)();
 			setConst(channel, 'fwd', 0)();
 		});
+
+        var activePitchMode = pitchMode[deck];
+		if (held) {
+			var engagedMode = activePitchMode.engaged();
+			var pitchButtons = {
+				'rate': device.top.left,
+				'pitch': device.top.right,
+				'absrate': device.bottom.left,
+				'abspitch': device.bottom.right,
+			}
+			for (modeName in pitchButtons) {
+				var pitchButton = pitchButtons[modeName];
+				expect(pitchButton.touch, repatch(activePitchMode.engage(modeName)));
+				tell(pitchButton.light[engagedMode === modeName ? 'blue' : 'black']);
+			}
+        }
     }
         
         
@@ -1072,6 +1144,8 @@ StantonSCS3d.Agent = function(device) {
      */
     function deckpatch(channel, held) {
         comm.sysex(device.modeset.circle);
+		deckLights();
+
         if (held) {
             tell(device.mode.deck.light.purple);
             var setDeck = function(newDeck) {
@@ -1264,29 +1338,9 @@ StantonSCS3d.Agent = function(device) {
         if (resetHotcue) resetHotcue();
 
         var activeMode = mode[deck];
-        
+
         var activePitchMode = pitchMode[deck];
-        var vinylHeld = activeMode.held() === 'vinyl';
-        activePitchMode.patch()(channel, vinylHeld);
-        if (vinylHeld) {
-            var engagedMode = activePitchMode.engaged();
-            var pitchButtons = {
-                'rate': device.top.left,
-                'pitch': device.top.right,
-                'absrate': device.bottom.left,
-                'abspitch': device.bottom.right,
-            }
-            for (modeName in pitchButtons) {
-                var pitchButton = pitchButtons[modeName];
-                expect(pitchButton.touch, repatch(activePitchMode.engage(modeName)));
-                tell(pitchButton.light[engagedMode === modeName ? 'blue' : 'black']);
-            }
-        } else {
-            tell(device.top.left.light[deck == 0 ? 'red' : 'black']);
-            tell(device.top.right.light[deck == 1 ? 'red' : 'black']);
-            tell(device.bottom.left.light[deck == 2 ? 'red' : 'black']);
-            tell(device.bottom.right.light[deck == 3 ? 'red' : 'black']);
-        }
+        activePitchMode.patch()(channel, activeMode.held() === 'vinyl');
 
         tell(device.mode.fx.light.black);
         tell(device.mode.eq.light.black);
