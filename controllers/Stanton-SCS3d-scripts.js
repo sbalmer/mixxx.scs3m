@@ -882,9 +882,8 @@ StantonSCS3d.Agent = function(device) {
 			// When effect is assigned to deck: blue
 			// When effect is the currently active: red
 			// May be both
-			var fxlight = function(light, buttonnr) {
+			var fxlight = function(light, active) {
 				return function(enabled) {
-					var active = nr == buttonnr;
 					var color = enabled
 						? (active ? 'purple' : 'blue')
 						: (active ? 'red' : 'black');
@@ -899,10 +898,11 @@ StantonSCS3d.Agent = function(device) {
 				var effectunit_enable = 'group_'+channel+'_enable';
 				if (held) {
 					expect(button.touch, repatch(toggle(effectunit, effectunit_enable)));
+					watch(effectunit, effectunit_enable, fxlight(button.light, deck == i));
 				} else {
 					expect(button.touch, repatch(effectMode.engage(i)));
+					watch(effectunit, effectunit_enable, fxlight(button.light, nr == i));
 				}
-				watch(effectunit, effectunit_enable, fxlight(button.light, i));
 			}
 		}
 	}
