@@ -918,6 +918,7 @@ StantonSCS3d.Agent = function(device) {
     function eqpatch(channel, held) {
         comm.sysex(device.modeset.slider);
         tell(device.mode.eq.light.red);
+		pitchPatch(channel);
 		deckLights();
         watch(channel, 'filterLow', Centerbar(device.slider.left.meter)); 
         watch(channel, 'filterMid', Centerbar(device.slider.middle.meter)); 
@@ -934,6 +935,7 @@ StantonSCS3d.Agent = function(device) {
 			Autocancel('rolling', function(engage, cancel) {
 				comm.sysex(device.modeset.circle);
 				tell(rolling ? device.mode.loop.light.blue : device.mode.loop.light.red);
+				pitchPatch(channel);
 				deckLights();
 
 				// Available loop lengths are powers of two in the range [-5..6]
@@ -1043,6 +1045,7 @@ StantonSCS3d.Agent = function(device) {
         return function(channel, held) {
             comm.sysex(device.modeset.button);
             tell(device.mode.trig.light.bits(trigset+1));
+			pitchPatch(channel);
 			deckLights();
 
             var i = 0;
@@ -1076,6 +1079,7 @@ StantonSCS3d.Agent = function(device) {
      */
     function vinylpatch(channel, held) {
         comm.sysex(device.modeset.circle);
+		pitchPatch(channel);
 		deckLights();
 
 		Autocancel('temprate', function(engage, cancel) {
@@ -1104,19 +1108,6 @@ StantonSCS3d.Agent = function(device) {
             engine.setParameter(channel, 'jog', (value - 64));
         });
 
-		expect(device.top.left.touch, setConst(channel, 'beatjump_1_backward', 1));
-		expect(device.top.right.touch, setConst(channel, 'beatjump_1_forward', 1));
-
-		Autocancel('fast', function(engage, cancel) {
-			expect(device.bottom.left.touch, both(engage, setConst(channel, 'back', 1)));
-			expect(device.bottom.left.release, cancel);
-			expect(device.bottom.right.touch, both(engage, setConst(channel, 'fwd', 1)));
-			expect(device.bottom.right.release, cancel);
-		}, function() {
-			setConst(channel, 'back', 0)();
-			setConst(channel, 'fwd', 0)();
-		});
-
         var activePitchMode = pitchMode[deck];
 		if (held) {
 			var engagedMode = activePitchMode.engaged();
@@ -1131,7 +1122,20 @@ StantonSCS3d.Agent = function(device) {
 				expect(pitchButton.touch, repatch(activePitchMode.engage(modeName)));
 				tell(pitchButton.light[engagedMode === modeName ? 'blue' : 'black']);
 			}
-        }
+        } else {
+			expect(device.top.left.touch, setConst(channel, 'beatjump_1_backward', 1));
+			expect(device.top.right.touch, setConst(channel, 'beatjump_1_forward', 1));
+
+			Autocancel('fast', function(engage, cancel) {
+				expect(device.bottom.left.touch, both(engage, setConst(channel, 'back', 1)));
+				expect(device.bottom.left.release, cancel);
+				expect(device.bottom.right.touch, both(engage, setConst(channel, 'fwd', 1)));
+				expect(device.bottom.right.release, cancel);
+			}, function() {
+				setConst(channel, 'back', 0)();
+				setConst(channel, 'fwd', 0)();
+			});
+		}
     }
         
         
@@ -1144,6 +1148,7 @@ StantonSCS3d.Agent = function(device) {
      */
     function deckpatch(channel, held) {
         comm.sysex(device.modeset.circle);
+		pitchPatch(channel);
 		deckLights();
 
         if (held) {
@@ -1319,6 +1324,11 @@ StantonSCS3d.Agent = function(device) {
         3: Modeswitch('rate', pitchModeMap)
     }
 
+	var pitchPatch = function(channel) {
+        var activePitchMode = pitchMode[deck];
+        activePitchMode.patch()(channel, mode[deck].held() === 'vinyl');
+	}
+
     function patchage() {
         tell(device.logo.on);
 
@@ -1338,9 +1348,6 @@ StantonSCS3d.Agent = function(device) {
         if (resetHotcue) resetHotcue();
 
         var activeMode = mode[deck];
-
-        var activePitchMode = pitchMode[deck];
-        activePitchMode.patch()(channel, activeMode.held() === 'vinyl');
 
         tell(device.mode.fx.light.black);
         tell(device.mode.eq.light.black);
@@ -1369,7 +1376,7 @@ StantonSCS3d.Agent = function(device) {
         Bar(device.slider.middle.meter)(0);
         Bar(device.slider.right.meter)(0);
         
-        // Call the patch function that was put into the switch with cycle()
+        // Call the patch function for the active mode
         activeMode.active()(channel, activeMode.held());
 
         expect(device.button.play.touch, toggle(channel, 'play'));
