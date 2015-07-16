@@ -2,6 +2,7 @@
 
 // issues:
 // - filterHigh/Mid/Low is deprecated, what is the replacement? 
+// - On FX-EQ, gain should reset pregain, crossfader should drop needle at beginning of track
 // - blink EQ when not zeroed?
 // - blink FX when one is engaged?
 

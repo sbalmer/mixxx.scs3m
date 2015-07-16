@@ -1,3 +1,5 @@
+// Issues
+// - Use EQ button to change pitch mode
 
 // Useful tinkering commands, channel reset and flat mode
 // amidi -p hw:1 -S F00001600200F7
