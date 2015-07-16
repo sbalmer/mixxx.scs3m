@@ -938,7 +938,7 @@ StantonSCS3d.Agent = function(device) {
 
     function LoopPatch(rolling) {
 		return function(channel) {
-			Autocancel('rolling', function(engage, cancel) {
+			var setup = function(engage, cancel) {
 				comm.sysex(device.modeset.circle);
 				tell(rolling ? device.mode.loop.light.blue : device.mode.loop.light.red);
 				pitchPatch(channel);
@@ -982,17 +982,21 @@ StantonSCS3d.Agent = function(device) {
 				});
 
 				if (rolling) {
-					expect(device.slider.circle.release, function(value) {
-						cancel();
-					});
+					expect(device.slider.circle.release, cancel);
 				} else {
-					expect(device.slider.middle.release, function(value) {
-						cancel();
-					});
+					expect(device.slider.middle.release, cancel);
 				}
-			}, function() {
-				set(channel, 'reloop_exit')(1);
-			});
+			};
+			var cancel = setConst(channel, 'reloop_exit', 1);
+
+			if (rolling) {
+				// The rolling loop will be canceled as soon as you release the circle
+				// or switch to another mode.
+				Autocancel('rolling', setup, cancel);
+			} else {
+				// Normal loops are canceled only by touching center
+				setup(false, cancel);
+			}
 		}
 	}
     
