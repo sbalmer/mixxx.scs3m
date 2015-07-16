@@ -916,7 +916,7 @@ StantonSCS3d.Agent = function(device) {
 	}
 
     // Active effect mode
-    var effectMode = Modeswitch(0, [FxPatch(0), FxPatch(1), FxPatch(3), FxPatch(4)]);
+    var effectMode = Modeswitch(0, [FxPatch(0), FxPatch(1), FxPatch(2), FxPatch(3)]);
 
     function fxpatch(channel, held) {
         tell(device.mode.fx.light.red);
