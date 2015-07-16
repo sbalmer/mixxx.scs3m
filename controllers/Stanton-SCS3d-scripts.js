@@ -1,5 +1,7 @@
 // Issues
 // - Hold EQ-PITCH to reset pitch/rate
+// - Each deck rembembers the mode it was in, confusing? Would it be better to
+//   keep the current mode on deck switch?
 
 // Useful tinkering commands, channel reset and flat mode
 // amidi -p hw:1 -S F00001600200F7
