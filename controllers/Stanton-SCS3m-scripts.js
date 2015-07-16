@@ -1,8 +1,10 @@
 "use strict";
 
 // issues:
-// - filterHigh/Mid/Low is deprecated, what is the replacement?
+// - filterHigh/Mid/Low is deprecated, what is the replacement? 
 // - On FX-EQ, gain should reset pregain, crossfader should drop needle at beginning of track
+// - blink EQ when not zeroed?
+// - blink FX when one is engaged?
 
 // manually test messages
 // amidi -p hw:1 -S F00001601501F7 # flat mode
@@ -458,8 +460,8 @@ StantonSCS3m.Agent = function(device) {
     function Multiswitch(preset) {
         var engaged = preset;
         return {
-            'engage': function(pos) { return function() { engaged = pos; }  },
-            'cancel': function(pos) { return function() { if (engaged === pos) engaged = preset; } },
+            'engage': function(pos) { engaged = pos; },
+            'cancel': function() { engaged = preset; },
             'engaged': function(pos) { return engaged === pos },
             'choose': function(pos, off, on) { return (engaged === pos) ? on : off; }
         }
@@ -481,6 +483,10 @@ StantonSCS3m.Agent = function(device) {
         right: Switch()
     }
     var fxheld = {
+        left: Switch(),
+        right: Switch()
+    }
+    var touchheld = {
         left: Switch(),
         right: Switch()
     }
@@ -522,6 +528,7 @@ StantonSCS3m.Agent = function(device) {
             var effectunit = '[EffectRack1_EffectUnit'+channelno+']';
             var effectunit_enable = 'group_'+channel+'_enable';
             var eqsideheld = eqheld[side];
+            var touchsideheld = touchheld[side];
             var sideoverlay = overlay[side];
             
             // Light the corresponding deck (channel 1: A, channel 2: B, channel 3: C, channel 4: D)
@@ -570,7 +577,12 @@ StantonSCS3m.Agent = function(device) {
                 watch(channel, 'filterLow', patch(offcenter(part.eq.low.meter.centerbar)));
             }
 
-            expect(part.modes.eq.touch, repatch(eqsideheld.engage));
+            expect(part.modes.eq.touch, repatch(function() {
+                eqsideheld.engage();
+                if (!touchsideheld.engaged()) {
+                    sideoverlay.cancel();
+                }
+            }));
             expect(part.modes.eq.release, repatch(eqsideheld.cancel));
             tell(part.modes.eq.light[eqsideheld.choose(sideoverlay.choose('eq', 'blue', 'red'), 'purple')]);
            
@@ -590,13 +602,19 @@ StantonSCS3m.Agent = function(device) {
                 if (fxsideheld.engaged() || master.engaged()) {
                     expect(touch.touch, toggle(effectunit, effectunit_enable));
                 } else {
-                    expect(touch.touch, repatch(sideoverlay.engage(tnr)));
+                    (function(tnr) { // close over tnr 
+                        expect(touch.touch, repatch(function() {
+                            sideoverlay.engage(tnr);
+                            touchsideheld.engage();
+                        }));
+                    }(tnr));
                 }
-                expect(touch.release, repatch(sideoverlay.cancel(tnr)));
+                expect(touch.release, repatch(touchsideheld.cancel));
                 if (sideoverlay.engaged(tnr)) {
+                    watch(effectunit, effectunit_enable, binarylight(touch.light.red, touch.light.purple));
                     tell(touch.light.purple);
                 } else {
-                    watch(effectunit, effectunit_enable, binarylight(touch.light.blue, touch.light.red));
+                    watch(effectunit, effectunit_enable, binarylight(touch.light.black, touch.light.blue));
                 }
                 
                 if (sideoverlay.engaged(tnr)) {
