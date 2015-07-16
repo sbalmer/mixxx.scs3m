@@ -1,5 +1,5 @@
 // Issues
-// - Use EQ button to change pitch mode
+// - Hold EQ-PITCH to reset pitch/rate
 
 // Useful tinkering commands, channel reset and flat mode
 // amidi -p hw:1 -S F00001600200F7
@@ -927,7 +927,6 @@ StantonSCS3d.Agent = function(device) {
         comm.sysex(device.modeset.slider);
         tell(device.mode.eq.light.red);
 		pitchPatch(channel);
-		deckLights();
         watch(channel, 'filterLow', Centerbar(device.slider.left.meter)); 
         watch(channel, 'filterMid', Centerbar(device.slider.middle.meter)); 
         watch(channel, 'filterHigh', Centerbar(device.slider.right.meter));
@@ -936,6 +935,24 @@ StantonSCS3d.Agent = function(device) {
         expect(device.slider.left.slide.abs, op(channel, 'filterLow'));
         expect(device.slider.middle.slide.abs, op(channel, 'filterMid'));
         expect(device.slider.right.slide.abs, op(channel, 'filterHigh'));
+
+		if (held) {
+			var activePitchMode = pitchMode[deck];
+			var engagedMode = activePitchMode.engaged();
+			var pitchButtons = {
+				'rate': device.top.left,
+				'pitch': device.top.right,
+				'absrate': device.bottom.left,
+				'abspitch': device.bottom.right,
+			}
+			for (modeName in pitchButtons) {
+				var pitchButton = pitchButtons[modeName];
+				expect(pitchButton.touch, repatch(activePitchMode.engage(modeName)));
+				tell(pitchButton.light[engagedMode === modeName ? 'blue' : 'black']);
+			}
+        } else {
+			deckLights();
+		}
     }
 
     function LoopPatch(rolling) {
@@ -1120,34 +1137,19 @@ StantonSCS3d.Agent = function(device) {
             engine.setParameter(channel, 'jog', (value - 64));
         });
 
-        var activePitchMode = pitchMode[deck];
-		if (held) {
-			var engagedMode = activePitchMode.engaged();
-			var pitchButtons = {
-				'rate': device.top.left,
-				'pitch': device.top.right,
-				'absrate': device.bottom.left,
-				'abspitch': device.bottom.right,
-			}
-			for (modeName in pitchButtons) {
-				var pitchButton = pitchButtons[modeName];
-				expect(pitchButton.touch, repatch(activePitchMode.engage(modeName)));
-				tell(pitchButton.light[engagedMode === modeName ? 'blue' : 'black']);
-			}
-        } else {
-			expect(device.top.left.touch, setConst(channel, 'beatjump_1_backward', 1));
-			expect(device.top.right.touch, setConst(channel, 'beatjump_1_forward', 1));
 
-			Autocancel('fast', function(engage, cancel) {
-				expect(device.bottom.left.touch, both(engage, setConst(channel, 'back', 1)));
-				expect(device.bottom.left.release, cancel);
-				expect(device.bottom.right.touch, both(engage, setConst(channel, 'fwd', 1)));
-				expect(device.bottom.right.release, cancel);
-			}, function() {
-				setConst(channel, 'back', 0)();
-				setConst(channel, 'fwd', 0)();
-			});
-		}
+		expect(device.top.left.touch, setConst(channel, 'beatjump_1_backward', 1));
+		expect(device.top.right.touch, setConst(channel, 'beatjump_1_forward', 1));
+
+		Autocancel('fast', function(engage, cancel) {
+			expect(device.bottom.left.touch, both(engage, setConst(channel, 'back', 1)));
+			expect(device.bottom.left.release, cancel);
+			expect(device.bottom.right.touch, both(engage, setConst(channel, 'fwd', 1)));
+			expect(device.bottom.right.release, cancel);
+		}, function() {
+			setConst(channel, 'back', 0)();
+			setConst(channel, 'fwd', 0)();
+		});
     }
         
         
