@@ -1,0 +1,57 @@
+Mixxx Stanton SCS.3m guide
+==========================
+
+Work in progress. Improvements and suggestions to the guide and the mapping itself are welcome.
+
+The mapping should be pretty straightforward, only the alternate modes are
+explained here.
+
+
+
+Deck switching buttons
+----------------------
+
+When touching the "A C" or "B D" buttons, the mixer switches between decks.
+On the left side, touching "A C" will switch between decks 1 and 3. On the right
+side, touching "B D" will switch between decks 2 and 4. All controls except for
+the crossfader then control the selected deck.
+
+
+
+Holding FX
+----------
+
+FX is employed as a "mode"-button and connects alternate controls. It affects
+only the side where it is held. Controls that change:
+Gain slider: controls channel pre-gain in relative mode
+Buttons: The four buttons toggle assignement to FX chains (See FX modes)
+Crossfader: Needle drop, absolute jump to the track location where you touch the crossfader
+
+
+EQ mode
+-------
+
+This is the standard mixing mde where the three EQ sliders control low/mid/high.
+The top slider controls the filter knob.
+
+Holding EQ and touching a slider will reset it to its preset position. (Unfortunately this doesn't work yet for FX and MASTER modes.)
+
+
+FX modes
+--------
+
+When one of the four buttons to the side of the gain slider is touched, the EQ-
+sliders control the selected effect chain. Top button selects first effect chain
+and so forth. In this mode, the EQ sliders control the first three knobs of the
+first effect in the selected effect chain. The top slider controls dry/wet mix.
+
+
+MASTER mode
+-----------
+
+When holding the central MASTER button, the left side controls the headphone
+channel, while the right side controls the master channel.
+Left top slider: Pre/main mix on headphone
+Right top slider: main balance
+Left slider: head gain
+Right slider: master gain

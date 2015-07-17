@@ -1,0 +1,110 @@
+Mixxx Stanton SCS.3d guide
+==========================
+
+Work in progress. Improvements and suggestions to the guide and the mapping itself are welcome.
+
+
+General controls
+----------------
+Unless otherwise noted, the following controls have the same function in all modes.
+
+S1: Controls gain of currently active deck.
+S2: Changes rate or pitch dpending on current mode, see EQ-mode for discussion.
+
+A light spinning aroundthe circle shows the track is playing. When the track
+nears its end (at -30 seconds), a blinking light will detach and run slower.
+When the spinning light reaches the blinking light, the track ends.
+
+By touching one of the six mode buttons, you switch to that mode. Some modes have alternate overlays, you can switch to those by touching the mode again. The first overlay is red, the second blue, the third is purple.
+
+By holding a mode button, a mode can be enabled temporarily until that mode button is released again. Some modes also enable an alternate hold-overlay.
+
+The currently active deck/channel is shown by lighting one of B11 through B14 red.
+See DECK mode on how to control this.
+
+
+
+FX mode
+-------
+
+FX mode allows you to control effects. Button B11 through B14 allow you to select the currently controlled chain. (Specifically, the first effect of each chain in the first effect rack is controlled.) The currently active effect is show in red.
+
+Slider S2 controls the wet/dry mix of the current effect. Sliders S3, S4, and S5 control the first three effect knobs on the effect unit.
+
+By holding FX, you can toggle assignement of the current channel to effect chains with buttons B11 through B14. The effects that have the current channel assigned are shown in blue. While FX is held, the currently active channel is shown in red.
+
+
+
+EQ mode
+-------
+
+In EQ mode, the central sliders S3, S4, S5 control low/mid/high filters. Holding
+EQ will reset the control to center when the corresponding slider is touched.
+
+While EQ is held, B11 through B14 set the pitch slider mode, the
+currently active mode lights blue:
+B11 Rate: Change the right up or down by holding the slider off-center.
+          The further from the center you hold the slider, the faster the rate changes.
+B13 Absolute rate: The pitch slider directly sets the rate in a wide range
+B12 Pitch: Change pitch by sliding up or down
+B14 Absolute pitch: jump to a pitch by touching the slider
+
+
+LOOP mode
+---------
+
+By touching the circle you activate a loop over a certain number of beats.
+Touching on the right side will activate a beat-loop over 1, 2, 4, 8 etc beats, starting from the top. On the left side you get fractions 1/2, 1/4, 1/8 etc loops starting from the top. To leave the loop, touch center.
+
+By touching the LOOP mode button again, the 'rolling' overlay comes on and the LOOP button turns blue. In rolling mode, the loop will be released as soon as you take your finger off the circle and the track will resume where it would have been without looping.
+
+
+TRIG mode
+---------
+
+You can set hotcues and jump to hotcues in this mode. The circle is split into
+five fields (1: top left, 2: bottom left, 3: top right, 4: bottom right, 5: center)
+where touching the area will either set the hotcue if it was unset, or trigger the
+hotcue if it was set. When a hotcue is set, the blue lights next to it will light.
+
+To clear a hotcue, old TRIG and touch the corresponding field.
+
+The first TRIG overlay (red light) controls hotcues 1 to 5, touching TRIG will
+switch to overlays 2 and three controlling hotcues 6 to 10 (blue light) and
+11 to 15 (purple light).
+
+
+VINYL mode
+----------
+
+The circle C1 functions as a jog-wheel, slide clockwise to speed-up the track.
+The center slider S4 can be used to raise and lower speed by holding it above or below center, respectively.
+
+B11 jumps back one beat, B12 jumps forward. B13 and B14 control fast-reverse,
+fast-forward.
+
+
+
+DECK mode
+---------
+
+This mode is used to load tracks. When the current deck is not playing,
+an arrow pattern indicates that the currently selected track can be loaded into
+the deck by pressing the central field S4. Sliding on the circle C1 will scroll through the library.
+
+B11 and B13 allow you to switch up and down between the library categories, while
+B12, B14 allow stepping thorugh the library list one-by-one (the slider allows only coarse control).
+
+When holding DECK, you can switch channels.
+B11: deck 1
+B12: deck 2
+B13: deck 3
+B14: deck 4
+The corresponding button turns red in most other modes too.
+
+The controller keeps its mode per channel. So when changing channel, the mode
+may change as well.
+
+Note that the active deck is synched with the SCS.3m, so when switching between
+decks 1 and 3, or 2 and 4 the other device changes as well.
+
