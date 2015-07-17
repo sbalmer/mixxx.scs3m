@@ -10,857 +10,857 @@
 StantonSCS3d = {};
 
 StantonSCS3d.init = function(id) {
-    this.device = this.Device();
-    this.agent = this.Agent(this.device);
-    this.agent.start();
+	this.device = this.Device();
+	this.agent = this.Agent(this.device);
+	this.agent.start();
 }
 
 StantonSCS3d.shutdown = function() {
-    StantonSCS3d.agent.stop();
+	StantonSCS3d.agent.stop();
 }
 
 StantonSCS3d.receive = function(channel, control, value, status) {
-    StantonSCS3d.agent.receive(status, control, value);
+	StantonSCS3d.agent.receive(status, control, value);
 }
 
 
 /* MIDI map */
 StantonSCS3d.Device = function() {
-    var NoteOn = 0x90;
-    var NoteOff = 0x80;
-    var CC = 0xB0;
-    
-    var black = 0x00;
-    var blue = 0x02;
-    var red = 0x01;
-    var purple = blue | red;
-    
-    function Logo() {
-        var id = 0x7A;
-        return {
-            on: [NoteOn, id, 0x01],
-            off: [NoteOn, id, 0x00]
-        }
-    }
-    
-    function Decklight(id) {
-        return function(value) {
-            return [NoteOn, id, +value]; // value might be boolean, coerce to int
-        };
-    }
-    
-    function Meter(id, lights) {
-        var ctrl = [];
-        var i = 0;
-        for (; i < lights; i++) {
-            ctrl[i] = [NoteOn, id+lights-i-1];
-        }
-        return ctrl;
-    }
+	var NoteOn = 0x90;
+	var NoteOff = 0x80;
+	var CC = 0xB0;
 
-    function Light(id) {
-        return {
-            bits: function(bits) { return [NoteOn, id, bits]; },
-            black: [NoteOn, id, black],
-            blue: [NoteOn, id, blue],
-            red: [NoteOn, id, red],
-            purple: [NoteOn, id, purple],
-        }
-    }
-    
-    function Slider(id, meterid, lights) {
-        return {
-            meter: Meter(meterid, lights),
-            slide: {
-                abs: [CC, id],
-                rel: [CC, id + 1],
-                
-            },
-            release: [NoteOff, id]
-        }
-    }
+	var black = 0x00;
+	var blue = 0x02;
+	var red = 0x01;
+	var purple = blue | red;
 
-    function LightSlider(id, meterid, lights) {
-        var slider = Slider(id, meterid, lights);
-        var redled = meterid-2;
-        var blueled = meterid-1;
-        
-        // Contrary to the other lights, the pitch light as separate addresses for red and blue
-        slider.light = {
-            red: { on: [NoteOn, redled, 1], off: [NoteOn, redled, 0] },
-            blue: { on: [NoteOn, blueled, 1], off: [NoteOn, blueled, 0] }
-        }
-        return slider;
-    }
+	function Logo() {
+		var id = 0x7A;
+		return {
+			on: [NoteOn, id, 0x01],
+			off: [NoteOn, id, 0x00]
+		}
+	}
 
-    function Touch(id, lightid) {
-        if (!lightid) lightid = id;
-        return {
-            light: Light(lightid),
-            touch: [NoteOn, id],
-            release: [NoteOff, id]
-        }
-    }
+	function Decklight(id) {
+		return function(value) {
+			return [NoteOn, id, +value]; // value might be boolean, coerce to int
+		};
+	}
+
+	function Meter(id, lights) {
+		var ctrl = [];
+		var i = 0;
+		for (; i < lights; i++) {
+			ctrl[i] = [NoteOn, id+lights-i-1];
+		}
+		return ctrl;
+	}
+
+	function Light(id) {
+		return {
+			bits: function(bits) { return [NoteOn, id, bits]; },
+			black: [NoteOn, id, black],
+			blue: [NoteOn, id, blue],
+			red: [NoteOn, id, red],
+			purple: [NoteOn, id, purple],
+		}
+	}
+
+	function Slider(id, meterid, lights) {
+		return {
+			meter: Meter(meterid, lights),
+			slide: {
+				abs: [CC, id],
+				rel: [CC, id + 1],
+
+			},
+			release: [NoteOff, id]
+		}
+	}
+
+	function LightSlider(id, meterid, lights) {
+		var slider = Slider(id, meterid, lights);
+		var redled = meterid-2;
+		var blueled = meterid-1;
+
+		// Contrary to the other lights, the pitch light as separate addresses for red and blue
+		slider.light = {
+			red: { on: [NoteOn, redled, 1], off: [NoteOn, redled, 0] },
+			blue: { on: [NoteOn, blueled, 1], off: [NoteOn, blueled, 0] }
+		}
+		return slider;
+	}
+
+	function Touch(id, lightid) {
+		if (!lightid) lightid = id;
+		return {
+			light: Light(lightid),
+			touch: [NoteOn, id],
+			release: [NoteOff, id]
+		}
+	}
 
 
-    // Stanton changed button mode in newer devices.
-    // Originally, in button mode, the three columns held 4 "buttons"
-    // each. Hitting one of those without accidentally touching another requires 
-    // very accurate motor control beyond the capabilities of a DJ (even when 
-    // sober). Later versions of the device send only two buttons per column
-    // (top/bottom), these are easy to hit.
-    //
-    // So not only do we need two id to map to the same field, we want to
-    // control multiple lights for this control as well. This is why we're using 
-    // the plural here. The respective functions expect() and tell() know about
-    // this, see demux().
-    function Field(ids, lightids) {
-        return {
-            touch: [NoteOn, ids],
-            release: [NoteOff, ids],
-            light: Light(lightids)
-        }
-    }
+	// Stanton changed button mode in newer devices.
+	// Originally, in button mode, the three columns held 4 "buttons"
+	// each. Hitting one of those without accidentally touching another requires
+	// very accurate motor control beyond the capabilities of a DJ (even when
+	// sober). Later versions of the device send only two buttons per column
+	// (top/bottom), these are easy to hit.
+	//
+	// So not only do we need two id to map to the same field, we want to
+	// control multiple lights for this control as well. This is why we're using
+	// the plural here. The respective functions expect() and tell() know about
+	// this, see demux().
+	function Field(ids, lightids) {
+		return {
+			touch: [NoteOn, ids],
+			release: [NoteOff, ids],
+			light: Light(lightids)
+		}
+	}
 
-    return {
-        modeset: {
-            // Byte three is the channel
-            version: [0xF0, 0x7E, 0x00, 0x06, 0x01, 0xF7],
-            flat:    [0xF0, 0x00, 0x01, 0x60, 0x10, 0x00, 0xF7],
-            circle:  [0xF0, 0x00, 0x01, 0x60, 0x01, 0x00, 0xF7],
-            slider:  [0xF0, 0x00, 0x01, 0x60, 0x01, 0x03, 0xF7],
-            button:  [0xF0, 0x00, 0x01, 0x60, 0x01, 0x04, 0xF7],
-            // Byte 6 sets the channel
-            channel: [0xF0, 0x00, 0x01, 0x60, 0x02, 0x00, 0xF7]
-        },
-        logo: Logo(),
-        decklight: [
-            Decklight(0x71), // A
-            Decklight(0x72)  // B
-        ],
-        gain: Slider(0x07, 0x34, 9),
-        pitch: LightSlider(0x03, 0x3F, 9),
-        mode: {
-            fx: Touch(0x20),
-            loop: Touch(0x22),
-            vinyl: Touch(0x24),
-            eq: Touch(0x26),
-            trig: Touch(0x28),
-            deck: Touch(0x2A),
-        },
-        top: {
-            left: Touch(0x2C),
-            right: Touch(0x2E)
-        },
-        slider: {
-            circle: Slider(0x62, 0x5d, 16),
-            left: Slider(0x0C, 0x48, 7),
-            middle: Slider(0x01, 0x56, 7),
-            right: Slider(0x0E, 0x4F, 7)
-        },
-        field: [
-            Touch([0x48, 0x4A], [0x61, 0x62, 0x63]),
-            Touch([0x4C, 0x4E], [0x5E, 0x5F, 0x60]),
-            Touch([0x4F, 0x51], [0x66, 0x67, 0x68]),
-            Touch([0x53, 0x55], [0x69, 0x6A, 0x6B]),
-            Touch(0x01, [0x64, 0x65, 0x5D, 0x6C])
-        ],
-        bottom: {
-            left: Touch(0x30),
-            right: Touch(0x32)
-        },
-        button: {
-            play: Touch(0x6D),
-            cue: Touch(0x6E),
-            sync: Touch(0x6F),
-            tap: Touch(0x70),
-        }
-    }
+	return {
+		modeset: {
+			// Byte three is the channel
+			version: [0xF0, 0x7E, 0x00, 0x06, 0x01, 0xF7],
+			flat:    [0xF0, 0x00, 0x01, 0x60, 0x10, 0x00, 0xF7],
+			circle:  [0xF0, 0x00, 0x01, 0x60, 0x01, 0x00, 0xF7],
+			slider:  [0xF0, 0x00, 0x01, 0x60, 0x01, 0x03, 0xF7],
+			button:  [0xF0, 0x00, 0x01, 0x60, 0x01, 0x04, 0xF7],
+			// Byte 6 sets the channel
+			channel: [0xF0, 0x00, 0x01, 0x60, 0x02, 0x00, 0xF7]
+		},
+		logo: Logo(),
+		decklight: [
+			Decklight(0x71), // A
+			Decklight(0x72)  // B
+		],
+		gain: Slider(0x07, 0x34, 9),
+		pitch: LightSlider(0x03, 0x3F, 9),
+		mode: {
+			fx: Touch(0x20),
+			loop: Touch(0x22),
+			vinyl: Touch(0x24),
+			eq: Touch(0x26),
+			trig: Touch(0x28),
+			deck: Touch(0x2A),
+		},
+		top: {
+			left: Touch(0x2C),
+			right: Touch(0x2E)
+		},
+		slider: {
+			circle: Slider(0x62, 0x5d, 16),
+			left: Slider(0x0C, 0x48, 7),
+			middle: Slider(0x01, 0x56, 7),
+			right: Slider(0x0E, 0x4F, 7)
+		},
+		field: [
+			Touch([0x48, 0x4A], [0x61, 0x62, 0x63]),
+			Touch([0x4C, 0x4E], [0x5E, 0x5F, 0x60]),
+			Touch([0x4F, 0x51], [0x66, 0x67, 0x68]),
+			Touch([0x53, 0x55], [0x69, 0x6A, 0x6B]),
+			Touch(0x01, [0x64, 0x65, 0x5D, 0x6C])
+		],
+		bottom: {
+			left: Touch(0x30),
+			right: Touch(0x32)
+		},
+		button: {
+			play: Touch(0x6D),
+			cue: Touch(0x6E),
+			sync: Touch(0x6F),
+			tap: Touch(0x70),
+		}
+	}
 }
 
 // debugging helper
 var printmess = function(message, text) {
-    var i;
-    var s = '';
+	var i;
+	var s = '';
 
-    for (i in message) {
-        s = s + ('0' + message[i].toString(16)).slice(-2)
-    }
-    print("Midi "+s+(text?' '+text:''));
+	for (i in message) {
+		s = s + ('0' + message[i].toString(16)).slice(-2)
+	}
+	print("Midi "+s+(text?' '+text:''));
 };
 
 
 
 StantonSCS3d.Comm = function() {
-    // Build a control identifier (CID) from the first two message bytes.
-    function CID(message) {
-        return (message[0] << 8) + message[1];
-    }
+	// Build a control identifier (CID) from the first two message bytes.
+	function CID(message) {
+		return (message[0] << 8) + message[1];
+	}
 
-    // Static state of the LED, indexed by CID
-    // This keeps the desired state before modifiers, so that adding
-    // or removing modifiers is possible without knowing the base state.
-    var base = {};
-    
-    // Modifier functions over base, indexed by CID
-    // The functions receive the last byte of the message and return the
-    // modified value.
-    var mask = {};
-    
-    // List of masks that depend on time
-    var ticking = {};
-    
-    // CID that may need updating
-    var dirty = {};
-    
-    // Last sent messages, indexed by CID
-    var actual = {};
-    
-    // Tick counter
-    var ticks = 0;
-    
-    // Handler functions indexed by CID
-    var receivers = {};
-    
-    // List of handlers for control changes from the engine
-    var watched = {};
-    
-    // Last sent SYSEX message
-    var actual_sysex = [];
-    
-    // List of functions to call on each tick
-    var repeats = [];
-    
-    function send() {
-        for (cid in dirty) {
-            var message = base[cid];
-            if (!message) continue; // As long as no base is set, don't send anything
-            
-            var last = actual[cid];
+	// Static state of the LED, indexed by CID
+	// This keeps the desired state before modifiers, so that adding
+	// or removing modifiers is possible without knowing the base state.
+	var base = {};
 
-            var value = message[2];
-            if (mask[cid]) {
-                value = mask[cid](value, ticks);
-            }
-            if (last === undefined || last != value) {
-                midi.sendShortMsg(message[0], message[1], value);
-                actual[cid] = value;
-            }
-        }
-        dirty = {};
-    }
-    
-    return {
-        base: function(message, force) {
-            var cid = CID(message);
+	// Modifier functions over base, indexed by CID
+	// The functions receive the last byte of the message and return the
+	// modified value.
+	var mask = {};
 
-            base[cid] = message;
-            dirty[cid] = true;
+	// List of masks that depend on time
+	var ticking = {};
 
-            if (force) {
-                delete actual[cid];
-            }
-        },
-    
-        mask: function(message, mod, changes) {
-            var cid = CID(message);
-            mask[cid] = mod;
-            dirty[cid] = true;
-            
-            if (changes) ticking[cid] = true;
-        },
-        
-        unmask: function(message) {
-            var cid = CID(message);
-            if (mask[cid]) {
-                delete mask[cid];
-                dirty[cid] = true;
-            }
-        },
+	// CID that may need updating
+	var dirty = {};
 
-        repeat: function(rep) {
-            repeats.push(rep);
-        },
+	// Last sent messages, indexed by CID
+	var actual = {};
 
-        tick: function() {
-            for (i in repeats) {
-                repeats[i](ticks);
-            }
-            for (cid in ticking) {
-                dirty[cid] = true;
-            }
-            send();
-            ticks += 1;
-        },
-        
-        clear: function() {
-            receivers = {};
-            ticking = {};
-            repeats = [];
-            for (cid in mask) {
-                dirty[cid] = true;
-            }
-            mask = {};
-            // base and actual are not cleared
+	// Tick counter
+	var ticks = 0;
 
-            // I'd like to disconnect all controls on clear, but that doesn't
-            // work when using closure callbacks. So we just don't listen to 
-            // those
-            for (ctrl in watched) {
-                if (watched.hasOwnProperty(ctrl)) {
-                    watched[ctrl] = [];
-                }
-            }
-        },
-        
-        expect: function(message, handler) {
+	// Handler functions indexed by CID
+	var receivers = {};
+
+	// List of handlers for control changes from the engine
+	var watched = {};
+
+	// Last sent SYSEX message
+	var actual_sysex = [];
+
+	// List of functions to call on each tick
+	var repeats = [];
+
+	function send() {
+		for (cid in dirty) {
+			var message = base[cid];
+			if (!message) continue; // As long as no base is set, don't send anything
+
+			var last = actual[cid];
+
+			var value = message[2];
+			if (mask[cid]) {
+				value = mask[cid](value, ticks);
+			}
+			if (last === undefined || last != value) {
+				midi.sendShortMsg(message[0], message[1], value);
+				actual[cid] = value;
+			}
+		}
+		dirty = {};
+	}
+
+	return {
+		base: function(message, force) {
+			var cid = CID(message);
+
+			base[cid] = message;
+			dirty[cid] = true;
+
+			if (force) {
+				delete actual[cid];
+			}
+		},
+
+		mask: function(message, mod, changes) {
+			var cid = CID(message);
+			mask[cid] = mod;
+			dirty[cid] = true;
+
+			if (changes) ticking[cid] = true;
+		},
+
+		unmask: function(message) {
+			var cid = CID(message);
+			if (mask[cid]) {
+				delete mask[cid];
+				dirty[cid] = true;
+			}
+		},
+
+		repeat: function(rep) {
+			repeats.push(rep);
+		},
+
+		tick: function() {
+			for (i in repeats) {
+				repeats[i](ticks);
+			}
+			for (cid in ticking) {
+				dirty[cid] = true;
+			}
+			send();
+			ticks += 1;
+		},
+
+		clear: function() {
+			receivers = {};
+			ticking = {};
+			repeats = [];
+			for (cid in mask) {
+				dirty[cid] = true;
+			}
+			mask = {};
+			// base and actual are not cleared
+
+			// I'd like to disconnect all controls on clear, but that doesn't
+			// work when using closure callbacks. So we just don't listen to
+			// those
+			for (ctrl in watched) {
+				if (watched.hasOwnProperty(ctrl)) {
+					watched[ctrl] = [];
+				}
+			}
+		},
+
+		expect: function(message, handler) {
 			if (!message || message.length < 2) print("ERROR: invalid message to expect: "+message);
-            var cid = CID(message);
+			var cid = CID(message);
 			if (receivers[cid]) return; // Don't steal
-            receivers[cid] = handler;
-        },
-        
-        receive: function(type, control, value) {
-            var cid = CID([type, control]);
-            var handler = receivers[cid];
-            if (handler) {
-                handler(value);
-                send();
-            }
-        },
-        
-        watch: function(channel, control, handler) {
-            var ctrl = channel + control;
+			receivers[cid] = handler;
+		},
 
-            if (!watched[ctrl]) {
-                watched[ctrl] = [];
-                engine.connectControl(channel, control, function(value, group, control) { 
-                    var handlers = watched[ctrl];
-                    if (handlers.length) {
-                        // Fetching parameter value is easier than mapping to [0..1] range ourselves
-                        value = engine.getParameter(group, control);
-                        
-                        var i = 0;
-                        for(; i < handlers.length; i++) {
-                            handlers[i](value);
-                        }
-                        send();
-                    }
-                });
-            }
+		receive: function(type, control, value) {
+			var cid = CID([type, control]);
+			var handler = receivers[cid];
+			if (handler) {
+				handler(value);
+				send();
+			}
+		},
 
-            watched[ctrl].push(handler);
-            
-            engine.trigger(channel, control);
-        },
-        
-        sysex: function(message) {
-            if (message.length == actual_sysex.length) {
-                var same = true;
-                for (i in message) {
-                    same = same && message[i] === actual_sysex[i];
-                }
-                if (same) return;
-            }
+		watch: function(channel, control, handler) {
+			var ctrl = channel + control;
 
-            midi.sendSysexMsg(message, message.length);
-            actual_sysex = message;
-        }
-    };
+			if (!watched[ctrl]) {
+				watched[ctrl] = [];
+				engine.connectControl(channel, control, function(value, group, control) {
+					var handlers = watched[ctrl];
+					if (handlers.length) {
+						// Fetching parameter value is easier than mapping to [0..1] range ourselves
+						value = engine.getParameter(group, control);
+
+						var i = 0;
+						for(; i < handlers.length; i++) {
+							handlers[i](value);
+						}
+						send();
+					}
+				});
+			}
+
+			watched[ctrl].push(handler);
+
+			engine.trigger(channel, control);
+		},
+
+		sysex: function(message) {
+			if (message.length == actual_sysex.length) {
+				var same = true;
+				for (i in message) {
+					same = same && message[i] === actual_sysex[i];
+				}
+				if (same) return;
+			}
+
+			midi.sendSysexMsg(message, message.length);
+			actual_sysex = message;
+		}
+	};
 }
 
 
 // Create a function that sets the rate of each channel by the timing between
 // calls
 StantonSCS3d.Syncopath = function() {
-    // Lists of last ten taps, per deck, in epoch milliseconds
-    var deckTaps = {};
+	// Lists of last ten taps, per deck, in epoch milliseconds
+	var deckTaps = {};
 
-    return function(channel) {
-        var now = new Date().getTime();
-        var taps = deckTaps[channel] || [];
+	return function(channel) {
+		var now = new Date().getTime();
+		var taps = deckTaps[channel] || [];
 
-        var last = taps[0] || 0;
-        var delta = now - last;
+		var last = taps[0] || 0;
+		var delta = now - last;
 
-        // Reset when taps are stale
-        if (delta > 2000) {
-            deckTaps[channel] = [now];
-            return;
-        }
-        
-        taps.unshift(now);
-        taps = taps.slice(0, 8); // Keep last eight
-        deckTaps[channel] = taps;
-        
-        //  Don't set rate until we have enough taps
-        if (taps.length < 3) return;
-        
-        // Calculate average bpm
-        var intervals = taps.length - 1;
-        var beatLength = (taps[0] - taps[intervals]) / intervals;
-        var bpm = 60000 / beatLength; // millis to 1/minutes
-        
-        // The desired pitch rate depends on the BPM of the track
-        var rate = bpm / engine.getValue(channel, "file_bpm");
+		// Reset when taps are stale
+		if (delta > 2000) {
+			deckTaps[channel] = [now];
+			return;
+		}
 
-        // Balk on outlandish rates
-        if (isNaN(rate) || rate < 0.05 || rate > 50) return;
-        
-        // Translate rate into pitch slider position
-        // This depends on the configured range of the slider
-        var pitchPos = (rate - 1) / engine.getValue(channel, "rateRange");
-        
-        engine.setValue(channel, "rate", pitchPos);
-    };
+		taps.unshift(now);
+		taps = taps.slice(0, 8); // Keep last eight
+		deckTaps[channel] = taps;
+
+		//  Don't set rate until we have enough taps
+		if (taps.length < 3) return;
+
+		// Calculate average bpm
+		var intervals = taps.length - 1;
+		var beatLength = (taps[0] - taps[intervals]) / intervals;
+		var bpm = 60000 / beatLength; // millis to 1/minutes
+
+		// The desired pitch rate depends on the BPM of the track
+		var rate = bpm / engine.getValue(channel, "file_bpm");
+
+		// Balk on outlandish rates
+		if (isNaN(rate) || rate < 0.05 || rate > 50) return;
+
+		// Translate rate into pitch slider position
+		// This depends on the configured range of the slider
+		var pitchPos = (rate - 1) / engine.getValue(channel, "rateRange");
+
+		engine.setValue(channel, "rate", pitchPos);
+	};
 }
 
 
 StantonSCS3d.Agent = function(device) {
 
-    // Multiple controller ID may be specified in the MIDI messages used
-    // internally. The output functions will demux and run the same action on
-    // both messages.
-    //
-    // demux(function(message) { print message; })(['hello', ['me', 'you']])
-    // -> hello,me
-    // -> hello,you
-    function demux(action) {
-        return function(message, nd) {
+	// Multiple controller ID may be specified in the MIDI messages used
+	// internally. The output functions will demux and run the same action on
+	// both messages.
+	//
+	// demux(function(message) { print message; })(['hello', ['me', 'you']])
+	// -> hello,me
+	// -> hello,you
+	function demux(action) {
+		return function(message, nd) {
 			if (!message || message.length < 2) {
 				print("ERROR: demux over invalid message: "+message);
 				return false;
 			}
-            var changed = false;
-            if (message[1].length) {
-                var i;
-                for (i in message[1]) {
-                    var demuxd = [message[0], message[1][i], message[2]];
-                    changed = action(demuxd, nd) || changed;
-                }
-            } else {
-                changed = action(message, nd);
-            }
-            return changed;
-        }
-    }
-    
-    var comm = StantonSCS3d.Comm();
-    var taps = StantonSCS3d.Syncopath();
+			var changed = false;
+			if (message[1].length) {
+				var i;
+				for (i in message[1]) {
+					var demuxd = [message[0], message[1][i], message[2]];
+					changed = action(demuxd, nd) || changed;
+				}
+			} else {
+				changed = action(message, nd);
+			}
+			return changed;
+		}
+	}
 
-    function expect(control, handler) {
-        demux(function(control) {
-            comm.expect(control, handler);
-        })(control);
-    }
+	var comm = StantonSCS3d.Comm();
+	var taps = StantonSCS3d.Syncopath();
 
-    function watch(channel, control, handler) {
-        comm.watch(channel, control, handler);
-    }
-    
-    function watchmulti(controls, handler) {
-        var values = {};
-        var wait = 0;
-        for (k in controls) {
-            wait += 1;
-            (function() { // Close over valuePos
-                var valuePos = k;
-                watch(controls[k][0], controls[k][1], function(value) {
-                    values[valuePos] = value;
-                    
-                    // Call handler once all values are collected
-                    // The simplistic wait countdown works because watch()
-                    // triggers all controls and they answer in series
-                    if (wait > 1) {
-                        wait -= 1;
-                    } else {
-                        handler(values);
-                    }
-                });
-            })();
-        }
-    }
+	function expect(control, handler) {
+		demux(function(control) {
+			comm.expect(control, handler);
+		})(control);
+	}
 
-    // Send MIDI message to device
-    // Param message: list of three MIDI bytes
-    // Param force: send value regardless of last recorded state
-    var tell = demux(function(message, force) {
-        comm.base(message, force);
-    });
+	function watch(channel, control, handler) {
+		comm.watch(channel, control, handler);
+	}
 
-    // Map engine values in the range [0..1] to lights
-    // translator maps from [0..1] to a midi message (three bytes)
-    function patch(translator) {
-        return function(value) {
-            tell(translator(value));
-        }
-    }
-    
-    // Patch multiple
-    function patchleds(translator) {
-        return function(value) {
-            var msgs = translator(value);
-            for (i in msgs) {
-                if (msgs.hasOwnProperty(i)) tell(msgs[i]);
-            }
-        }
-    }
-    
-    function binarylight(off, on) {
-        return function(value) {
-            tell(value ? on : off);
-        }
-    }
-    
-    // Return a handler that lights one LED depending on value
-    function Needle(lights) {
-        var range = lights.length - 1;
-        return function(value) {
-            // Where's the needle?
-            // On the first light for zero values, on the last for one.
-            var pos = Math.max(0, Math.min(range, Math.round(value * range)));
-            var i = 0;
-            for (; i <= range; i++) {
-                var light = lights[i];
+	function watchmulti(controls, handler) {
+		var values = {};
+		var wait = 0;
+		for (k in controls) {
+			wait += 1;
+			(function() { // Close over valuePos
+				var valuePos = k;
+				watch(controls[k][0], controls[k][1], function(value) {
+					values[valuePos] = value;
+
+					// Call handler once all values are collected
+					// The simplistic wait countdown works because watch()
+					// triggers all controls and they answer in series
+					if (wait > 1) {
+						wait -= 1;
+					} else {
+						handler(values);
+					}
+				});
+			})();
+		}
+	}
+
+	// Send MIDI message to device
+	// Param message: list of three MIDI bytes
+	// Param force: send value regardless of last recorded state
+	var tell = demux(function(message, force) {
+		comm.base(message, force);
+	});
+
+	// Map engine values in the range [0..1] to lights
+	// translator maps from [0..1] to a midi message (three bytes)
+	function patch(translator) {
+		return function(value) {
+			tell(translator(value));
+		}
+	}
+
+	// Patch multiple
+	function patchleds(translator) {
+		return function(value) {
+			var msgs = translator(value);
+			for (i in msgs) {
+				if (msgs.hasOwnProperty(i)) tell(msgs[i]);
+			}
+		}
+	}
+
+	function binarylight(off, on) {
+		return function(value) {
+			tell(value ? on : off);
+		}
+	}
+
+	// Return a handler that lights one LED depending on value
+	function Needle(lights) {
+		var range = lights.length - 1;
+		return function(value) {
+			// Where's the needle?
+			// On the first light for zero values, on the last for one.
+			var pos = Math.max(0, Math.min(range, Math.round(value * range)));
+			var i = 0;
+			for (; i <= range; i++) {
+				var light = lights[i];
 				var on = i == pos;
-                tell([light[0], light[1], +on]);
-            }
-        }
-    }
-    
-    // Return a handler that lights LED from the center of the meter
-    function Centerbar(lights) {
-        var count = lights.length;
-        var range = count - 1;
-        var center = Math.round(count / 2) - 1; // Zero-based
-        return function(value) {
-            var pos = Math.max(0, Math.min(range, Math.round(value * range)));
-            var left = Math.min(center, pos);
-            var right = Math.max(center, pos);
-            var i = 0;
-            for (; i < count; i++) {
-                var light = lights[i];
+				tell([light[0], light[1], +on]);
+			}
+		}
+	}
+
+	// Return a handler that lights LED from the center of the meter
+	function Centerbar(lights) {
+		var count = lights.length;
+		var range = count - 1;
+		var center = Math.round(count / 2) - 1; // Zero-based
+		return function(value) {
+			var pos = Math.max(0, Math.min(range, Math.round(value * range)));
+			var left = Math.min(center, pos);
+			var right = Math.max(center, pos);
+			var i = 0;
+			for (; i < count; i++) {
+				var light = lights[i];
 				var on = i >= left && i <= right;
-                tell([light[0], light[1], +on]);
-            }
-        }
-    }
-    
-    // Return a handler that lights LED from the bottom of the meter
-    // For zero values no light is turned on
-    function Bar(lights) {
-        var count = lights.length;
-        var range = count - 1;
-        return function(value) {
-            var pos;
-            if (value == 0) {
-                pos = -1; // no light
-            } else {
-                pos = Math.max(0, Math.min(range, Math.round(value * range)));
-            }
-            var i = 0;
-            for (; i < lights.length; i++) {
-                var light = lights[i];
+				tell([light[0], light[1], +on]);
+			}
+		}
+	}
+
+	// Return a handler that lights LED from the bottom of the meter
+	// For zero values no light is turned on
+	function Bar(lights) {
+		var count = lights.length;
+		var range = count - 1;
+		return function(value) {
+			var pos;
+			if (value == 0) {
+				pos = -1; // no light
+			} else {
+				pos = Math.max(0, Math.min(range, Math.round(value * range)));
+			}
+			var i = 0;
+			for (; i < lights.length; i++) {
+				var light = lights[i];
 				var on = i <= pos;
-                tell([light[0], light[1], +on]);
-            }
-        }
-    }
-    
-    // Create a function that returns a constat value
-    var constant = function(val) {
-        var constant = val;
-        return function() { return constant; }
-    }
-    
-    // Light leds in the circle according to pattern
-    // Pattern is a two-dimensional array 3 x 7 of bools
-    function centerlights(pattern, rate) {
-        var slidernames = ['left', 'middle', 'right'];
-        for(y in slidernames) {
-            var lights = device.slider[slidernames[y]].meter;
-            for (x in lights) {
-                var light = lights[lights.length - 1 - x];
-                var pat = pattern[x][y];
-                if (pat.length) {
-                    // It moves!
-                    comm.mask([light[0], light[1]], Blinker(rate, pat), true);
-                } else {
-                    comm.mask([light[0], light[1]], constant(pat), false);
-                }
-            }
-        }
-    }
+				tell([light[0], light[1], +on]);
+			}
+		}
+	}
+
+	// Create a function that returns a constat value
+	var constant = function(val) {
+		var constant = val;
+		return function() { return constant; }
+	}
+
+	// Light leds in the circle according to pattern
+	// Pattern is a two-dimensional array 3 x 7 of bools
+	function centerlights(pattern, rate) {
+		var slidernames = ['left', 'middle', 'right'];
+		for(y in slidernames) {
+			var lights = device.slider[slidernames[y]].meter;
+			for (x in lights) {
+				var light = lights[lights.length - 1 - x];
+				var pat = pattern[x][y];
+				if (pat.length) {
+					// It moves!
+					comm.mask([light[0], light[1]], Blinker(rate, pat), true);
+				} else {
+					comm.mask([light[0], light[1]], constant(pat), false);
+				}
+			}
+		}
+	}
 
 
-    // Create a function that returns the value or its boolean inverse
-    // First parameter controls the blink rate where bigger is slower
-    // (starts at 1; 2 is half the speed)
-    // Second parameter provides a blink pattern which is a list of bits
-    function Blinker(rate, pattern) {
-        return function(value, ticks) {
-            return pattern[Math.floor(ticks / rate) % pattern.length] ? !value : value;
-        }
-    }
-    
-    var blinken = {
-        ready: new Blinker(3, [1,0,0]),
-        heartbeat: new Blinker(1, [1,0,1,0,0,0,0,0,0]),
-    }
-    
-    // Show a spinning light in remembrance of analog technology
-    function spinLight(channel, warnDuration) {
-        watchmulti({
-            'position': [channel, 'playposition'],
-            'duration': [channel, 'duration'],
-            'play':     [channel, 'play'],
-            'rate':     [channel, 'rate'],
-            'range':    [channel, 'rateRange']
-        }, function(values) {
-            // Duration is not rate-corrected
-            var duration = values.duration;
+	// Create a function that returns the value or its boolean inverse
+	// First parameter controls the blink rate where bigger is slower
+	// (starts at 1; 2 is half the speed)
+	// Second parameter provides a blink pattern which is a list of bits
+	function Blinker(rate, pattern) {
+		return function(value, ticks) {
+			return pattern[Math.floor(ticks / rate) % pattern.length] ? !value : value;
+		}
+	}
 
-            // Which means the seconds we get are not rate-corrected either.
-            // They tick faster for higher rates.
-            var seconds = duration * values.position;
+	var blinken = {
+		ready: new Blinker(3, [1,0,0]),
+		heartbeat: new Blinker(1, [1,0,1,0,0,0,0,0,0]),
+	}
 
-            // 33⅓rpm = 100 / 3 / 60 rounds/second = 1.8 seconds/round
-            var rounds = seconds / 1.8;
-            
-            // Fractional part is needle's position in the circle
+	// Show a spinning light in remembrance of analog technology
+	function spinLight(channel, warnDuration) {
+		watchmulti({
+			'position': [channel, 'playposition'],
+			'duration': [channel, 'duration'],
+			'play':     [channel, 'play'],
+			'rate':     [channel, 'rate'],
+			'range':    [channel, 'rateRange']
+		}, function(values) {
+			// Duration is not rate-corrected
+			var duration = values.duration;
+
+			// Which means the seconds we get are not rate-corrected either.
+			// They tick faster for higher rates.
+			var seconds = duration * values.position;
+
+			// 33⅓rpm = 100 / 3 / 60 rounds/second = 1.8 seconds/round
+			var rounds = seconds / 1.8;
+
+			// Fractional part is needle's position in the circle
 			// Light addressing starts bottom left, add offset so it starts at top like the spinnies
-            var needle = (rounds + 0.5) % 1;
+			var needle = (rounds + 0.5) % 1;
 
-            var lights = device.slider.circle.meter;
-            var count = lights.length;
-            var playable = values.duration > 0 && values.position < 1;
-            var paused = !values.play && playable;
-            var pos = false;
-            
-            // Don't show position indicator when the end is reached
-            if (playable) {
-                pos = count - Math.floor(needle * count) - 1; // Zero-based index
-            }
+			var lights = device.slider.circle.meter;
+			var count = lights.length;
+			var playable = values.duration > 0 && values.position < 1;
+			var paused = !values.play && playable;
+			var pos = false;
 
-            // Add a warning indicator for the last seconds of a song
-            var left = duration - seconds;
-            
-            // Because the seconds are not rate-corrected, we must scale
-            // warnDuration according to pitch rate.
-            var scaledWarnDuration = warnDuration + warnDuration * ((values.rate - 0.5) * 2 * values.range);
+			// Don't show position indicator when the end is reached
+			if (playable) {
+				pos = count - Math.floor(needle * count) - 1; // Zero-based index
+			}
 
-            var warnPos = false;
-            if (playable && left < scaledWarnDuration) {
-                // Add a blinking light that runs a tad slower so the needle
-                // will reach it when the track runs out
-                var warnLight = (needle + (left / scaledWarnDuration)) % 1;
-                warnPos = count - Math.floor(warnLight * count) - 1;
-            }
+			// Add a warning indicator for the last seconds of a song
+			var left = duration - seconds;
 
-            var i = 0;
-            for (; i < count; i++) {
-                if (i === warnPos) {
-                    comm.mask(lights[i], blinken.heartbeat, true);
-                } else if (i === pos) {
-                    if (paused) {
-                        comm.mask(lights[i], blinken.ready, true);
-                    } else {
-                        comm.mask(lights[i], function(value) { return !value; }); // Invert
-                    }
-                } else {
-                    comm.unmask(lights[i]);
-                }
-            }
-        });
-    }
+			// Because the seconds are not rate-corrected, we must scale
+			// warnDuration according to pitch rate.
+			var scaledWarnDuration = warnDuration + warnDuration * ((values.rate - 0.5) * 2 * values.range);
 
-    // absolute control
-    function both(c1, c2) {
+			var warnPos = false;
+			if (playable && left < scaledWarnDuration) {
+				// Add a blinking light that runs a tad slower so the needle
+				// will reach it when the track runs out
+				var warnLight = (needle + (left / scaledWarnDuration)) % 1;
+				warnPos = count - Math.floor(warnLight * count) - 1;
+			}
+
+			var i = 0;
+			for (; i < count; i++) {
+				if (i === warnPos) {
+					comm.mask(lights[i], blinken.heartbeat, true);
+				} else if (i === pos) {
+					if (paused) {
+						comm.mask(lights[i], blinken.ready, true);
+					} else {
+						comm.mask(lights[i], function(value) { return !value; }); // Invert
+					}
+				} else {
+					comm.unmask(lights[i]);
+				}
+			}
+		});
+	}
+
+	// absolute control
+	function both(c1, c2) {
 		return function(value) {
 			c1(value);
 			c2(value);
 		}
-    }
+	}
 
-    // absolute control
-    function set(channel, control) {
-        return function(value) {
-            engine.setParameter(channel, control,
-                value/127
-            );
-        }
-    }
+	// absolute control
+	function set(channel, control) {
+		return function(value) {
+			engine.setParameter(channel, control,
+				value/127
+			);
+		}
+	}
 
-    function setConst(channel, control, value) {
-        return function() {
-            engine.setParameter(channel, control, value);
-        }
-    }
-    
-    function reset(channel, control) {
-        return function() {
-            engine.reset(channel, control);
-        }
-    }
+	function setConst(channel, control, value) {
+		return function() {
+			engine.setParameter(channel, control, value);
+		}
+	}
 
-    // relative control
-    function budge(channel, control, scale) {
-        length = 128 / (scale || 1);
-        return function(offset) {
-            engine.setValue(channel, control,
-                engine.getValue(channel, control)
-                + (offset-64)/length
-            );
-        }
-    }
-    
-    // switch
-    function toggle(channel, control) {
-        return function() {
-            engine.setValue(channel, control,
-                !engine.getValue(channel, control)
-            );
-        }
-    }
+	function reset(channel, control) {
+		return function() {
+			engine.reset(channel, control);
+		}
+	}
 
-    function Switch() {
-        var engaged = false;
-        function change(state) {
-            var prev = engaged;
-            engaged = !!state; // Coerce to bool
-            return engaged !== prev;
-        }
-        return {
-            'change': function(state) { return change(state); },
-            'engage': function() { return change(true); },
-            'cancel': function() { return change(false); },
-            'toggle': function() { return change(!engaged); },
-            'engaged': function() { return engaged; },
-            'choose': function(off, on) { return engaged ? on : off; }
-        }
-    }
-    
-    function Modeswitch(presetMode, patches) {
-        var engaged = presetMode;
+	// relative control
+	function budge(channel, control, scale) {
+		length = 128 / (scale || 1);
+		return function(offset) {
+			engine.setValue(channel, control,
+				engine.getValue(channel, control)
+				+ (offset-64)/length
+			);
+		}
+	}
 
-        return {
-            engage: function(newMode) {
-                return function() {
-                    if (engaged === newMode) return false;
-                    engaged = newMode;
-                    return true;
-                }
-            },
-            engaged: function() { return engaged; },
-            patch: function() { return patches[engaged]; }
-        }
-    }
+	// switch
+	function toggle(channel, control) {
+		return function() {
+			engine.setValue(channel, control,
+				!engine.getValue(channel, control)
+			);
+		}
+	}
 
-    function MultiModeswitch(presetMode, modePatches) {
-        var engagedMode = presetMode;
-        var engagedPatch = modePatches[engagedMode][0];
+	function Switch() {
+		var engaged = false;
+		function change(state) {
+			var prev = engaged;
+			engaged = !!state; // Coerce to bool
+			return engaged !== prev;
+		}
+		return {
+			'change': function(state) { return change(state); },
+			'engage': function() { return change(true); },
+			'cancel': function() { return change(false); },
+			'toggle': function() { return change(!engaged); },
+			'engaged': function() { return engaged; },
+			'choose': function(off, on) { return engaged ? on : off; }
+		}
+	}
+
+	function Modeswitch(presetMode, patches) {
+		var engaged = presetMode;
+
+		return {
+			engage: function(newMode) {
+				return function() {
+					if (engaged === newMode) return false;
+					engaged = newMode;
+					return true;
+				}
+			},
+			engaged: function() { return engaged; },
+			patch: function() { return patches[engaged]; }
+		}
+	}
+
+	function MultiModeswitch(presetMode, modePatches) {
+		var engagedMode = presetMode;
+		var engagedPatch = modePatches[engagedMode][0];
 
 		// For every mode, keep the patch that was engaged last
-        var engaged = {};
-        engaged[presetMode] = engagedPatch;
+		var engaged = {};
+		engaged[presetMode] = engagedPatch;
 
-        var heldMode = false;
-        var heldPatch = false;
-        var lastHold = 0;
+		var heldMode = false;
+		var heldPatch = false;
+		var lastHold = 0;
 
-        return {
-            hold: function(newHeldMode) {
-                return function() {
-                    heldMode = newHeldMode;
-                    heldPatch = engaged[heldMode];
-                    if (!heldPatch) heldPatch = modePatches[heldMode][0];
+		return {
+			hold: function(newHeldMode) {
+				return function() {
+					heldMode = newHeldMode;
+					heldPatch = engaged[heldMode];
+					if (!heldPatch) heldPatch = modePatches[heldMode][0];
 
-                    lastHold = new Date().getTime();
-                    return true;
-                };
-            },
-            release: function(releasedMode) {
-                return function() {
-                    if (releasedMode === heldMode || releasedMode === true) {
-                        if (new Date().getTime() - lastHold < 200) {
-                            // The button was just touched, not held
-                            var patches = modePatches[heldMode];
-                            if (engagedMode === heldMode) {
-                                // Cycle to the next patch
-                                engagedPatch = patches[(patches.indexOf(engagedPatch) + 1) % patches.length];
+					lastHold = new Date().getTime();
+					return true;
+				};
+			},
+			release: function(releasedMode) {
+				return function() {
+					if (releasedMode === heldMode || releasedMode === true) {
+						if (new Date().getTime() - lastHold < 200) {
+							// The button was just touched, not held
+							var patches = modePatches[heldMode];
+							if (engagedMode === heldMode) {
+								// Cycle to the next patch
+								engagedPatch = patches[(patches.indexOf(engagedPatch) + 1) % patches.length];
 								engaged[heldMode] = engagedPatch;
-                            } else {
-                                // Switch to the mode
-                                engagedMode = heldMode;
-                                engagedPatch = heldPatch;
-                                engaged[heldMode] = heldPatch;
-                            }
-                        }
-                    }
-                    heldMode = false;
-                    heldPatch = false;
-                    return true;
-                };
-            },
-            held: function() {  return heldMode; },
-            engaged: function() { return engagedMode; },
-            active: function() { return heldPatch || engagedPatch; }
-        }
-    }
-    
-    // The current deck
-    // Deck 1: 0b00
-    // Deck 2: 0b01
-    // Deck 3: 0b10
-    // Deck 4: 0b11
-    var deck = 0; // Deck 1 is preset
+							} else {
+								// Switch to the mode
+								engagedMode = heldMode;
+								engagedPatch = heldPatch;
+								engaged[heldMode] = heldPatch;
+							}
+						}
+					}
+					heldMode = false;
+					heldPatch = false;
+					return true;
+				};
+			},
+			held: function() {  return heldMode; },
+			engaged: function() { return engagedMode; },
+			active: function() { return heldPatch || engagedPatch; }
+		}
+	}
 
-    // Glean current channels from control value
-    function gleanChannel(value) {
-        var readDeck;
-        var changed = false;
+	// The current deck
+	// Deck 1: 0b00
+	// Deck 2: 0b01
+	// Deck 3: 0b10
+	// Deck 4: 0b11
+	var deck = 0; // Deck 1 is preset
 
-        // check third bit and proceed if it's set
-        // otherwise the control is assumed not to carry deck information
-        if (value & 0x4) {
-            // I don't often get the pleasure to work with bits
-            // Sure a simple if() cluster would be more clear
+	// Glean current channels from control value
+	function gleanChannel(value) {
+		var readDeck;
+		var changed = false;
 
-            // Get side we're on (1 == right)
-            var side = deck & 1;
-            
-            // Which bit to read (read bit 2 for right)
-            var altBit = 1 << side;
-            
-            // Whether the main or the alt deck is selected on the SCS3M
-            var alt = !!(value & altBit);
-            
-            // construct new deck value
-            var newDeck = side | alt << 1;
-            
-            changed = newDeck !== deck;
-            deck = newDeck;
-        }
+		// check third bit and proceed if it's set
+		// otherwise the control is assumed not to carry deck information
+		if (value & 0x4) {
+			// I don't often get the pleasure to work with bits
+			// Sure a simple if() cluster would be more clear
 
-        if (changed) {
-            // Prevent stuck mode buttons on deck switch
-            mode[0].release(true);
-            mode[1].release(true);
-            mode[2].release(true);
-            mode[3].release(true);
-        }
-        return changed;
-    }
-    
-    function repatch(handler) {
-        return function(value) {
-            var changed = handler(value);
-            if (changed) {
-                comm.clear();
-                patchage();
-            }
-        }
-    }
+			// Get side we're on (1 == right)
+			var side = deck & 1;
+
+			// Which bit to read (read bit 2 for right)
+			var altBit = 1 << side;
+
+			// Whether the main or the alt deck is selected on the SCS3M
+			var alt = !!(value & altBit);
+
+			// construct new deck value
+			var newDeck = side | alt << 1;
+
+			changed = newDeck !== deck;
+			deck = newDeck;
+		}
+
+		if (changed) {
+			// Prevent stuck mode buttons on deck switch
+			mode[0].release(true);
+			mode[1].release(true);
+			mode[2].release(true);
+			mode[3].release(true);
+		}
+		return changed;
+	}
+
+	function repatch(handler) {
+		return function(value) {
+			var changed = handler(value);
+			if (changed) {
+				comm.clear();
+				patchage();
+			}
+		}
+	}
 
 	var buttons = [device.top.left, device.top.right, device.bottom.left, device.bottom.right];
 
@@ -917,26 +917,26 @@ StantonSCS3d.Agent = function(device) {
 		}
 	}
 
-    // Active effect mode
-    var effectMode = Modeswitch(0, [FxPatch(0), FxPatch(1), FxPatch(2), FxPatch(3)]);
+	// Active effect mode
+	var effectMode = Modeswitch(0, [FxPatch(0), FxPatch(1), FxPatch(2), FxPatch(3)]);
 
-    function fxpatch(channel, held) {
-        tell(device.mode.fx.light.red);
+	function fxpatch(channel, held) {
+		tell(device.mode.fx.light.red);
 		effectMode.patch()(channel, held);
-    }
+	}
 
-    function eqpatch(channel, held) {
-        comm.sysex(device.modeset.slider);
-        tell(device.mode.eq.light.red);
+	function eqpatch(channel, held) {
+		comm.sysex(device.modeset.slider);
+		tell(device.mode.eq.light.red);
 		pitchPatch(channel);
-        watch(channel, 'filterLow', Centerbar(device.slider.left.meter)); 
-        watch(channel, 'filterMid', Centerbar(device.slider.middle.meter)); 
-        watch(channel, 'filterHigh', Centerbar(device.slider.right.meter));
-        
-        var op = held ? reset : set;
-        expect(device.slider.left.slide.abs, op(channel, 'filterLow'));
-        expect(device.slider.middle.slide.abs, op(channel, 'filterMid'));
-        expect(device.slider.right.slide.abs, op(channel, 'filterHigh'));
+		watch(channel, 'filterLow', Centerbar(device.slider.left.meter));
+		watch(channel, 'filterMid', Centerbar(device.slider.middle.meter));
+		watch(channel, 'filterHigh', Centerbar(device.slider.right.meter));
+
+		var op = held ? reset : set;
+		expect(device.slider.left.slide.abs, op(channel, 'filterLow'));
+		expect(device.slider.middle.slide.abs, op(channel, 'filterMid'));
+		expect(device.slider.right.slide.abs, op(channel, 'filterHigh'));
 
 		if (held) {
 			var activePitchMode = pitchMode[deck];
@@ -952,12 +952,12 @@ StantonSCS3d.Agent = function(device) {
 				expect(pitchButton.touch, repatch(activePitchMode.engage(modeName)));
 				tell(pitchButton.light[engagedMode === modeName ? 'blue' : 'black']);
 			}
-        } else {
+		} else {
 			deckLights();
 		}
-    }
+	}
 
-    function LoopPatch(rolling) {
+	function LoopPatch(rolling) {
 		return function(channel) {
 			var setup = function(engage, cancel) {
 				comm.sysex(device.modeset.circle);
@@ -1020,79 +1020,79 @@ StantonSCS3d.Agent = function(device) {
 			}
 		}
 	}
-    
-    // Keep track of hotcue to reset on layout changes or when another hotcue 
-    // becomes active.
-    var resetHotcue = false;
-    
-    /* Patch circle buttons to five hotcues
-     *
-     * left top = hotcue 1
-     * left bottom = hotcue 2
-     * right top = hotcue 3
-     * right bottom = hotcue 4
-     * center strip = hotcue 5
-     * 
-     * The trigset parameter selects the set of hotcues to
-     * activate. Passing 0 selects hotcues 1 through 5, passing 2
-     * selects hotcues 11 through 15.
-     */
-    function Trigpatch(trigset) {
-        var touchRelease = function(channel, field, control) {
-            // We need to send a zero when the control is released again.
-            // But this may happen after another control is touched.
-            // So the reset must happen whenever
-            // 1. this trigger button is released
-            // 2. another trigger button is touched
-            // 3. repatch() happens
-            //
-            // To avoid sending spurious resets we only do reset once after a
-            // touch. Unfortunately there is a border case we can't cover
-            // without intricate logic. For older devices two fields are
-            // merged into one but we receive note on then off when sliding
-            // between the two.
-            var cocked = 0;
 
-            var release = function() {
-                if (cocked == 1) engine.setValue(channel, control, 0);
-                if (cocked > 0) cocked -= 1;
-            };
-            expect(field.touch, function() {
-                // resetHotcue might be set by another hotcue
-                if (cocked == 0) {
-                    if (resetHotcue) resetHotcue();
-                    engine.setValue(channel, control, 1);
-                }
-                resetHotcue = function() {
-                    release();
-                    resetHotcue = false;
-                };
-                cocked += 1;
+	// Keep track of hotcue to reset on layout changes or when another hotcue
+	// becomes active.
+	var resetHotcue = false;
 
-            });
-            expect(field.release, release);
-        };
+	/* Patch circle buttons to five hotcues
+	*
+	* left top = hotcue 1
+	* left bottom = hotcue 2
+	* right top = hotcue 3
+	* right bottom = hotcue 4
+	* center strip = hotcue 5
+	*
+	* The trigset parameter selects the set of hotcues to
+	* activate. Passing 0 selects hotcues 1 through 5, passing 2
+	* selects hotcues 11 through 15.
+	*/
+	function Trigpatch(trigset) {
+		var touchRelease = function(channel, field, control) {
+			// We need to send a zero when the control is released again.
+			// But this may happen after another control is touched.
+			// So the reset must happen whenever
+			// 1. this trigger button is released
+			// 2. another trigger button is touched
+			// 3. repatch() happens
+			//
+			// To avoid sending spurious resets we only do reset once after a
+			// touch. Unfortunately there is a border case we can't cover
+			// without intricate logic. For older devices two fields are
+			// merged into one but we receive note on then off when sliding
+			// between the two.
+			var cocked = 0;
 
-        return function(channel, held) {
-            comm.sysex(device.modeset.button);
-            tell(device.mode.trig.light.bits(trigset+1));
+			var release = function() {
+				if (cocked == 1) engine.setValue(channel, control, 0);
+				if (cocked > 0) cocked -= 1;
+			};
+			expect(field.touch, function() {
+				// resetHotcue might be set by another hotcue
+				if (cocked == 0) {
+					if (resetHotcue) resetHotcue();
+					engine.setValue(channel, control, 1);
+				}
+				resetHotcue = function() {
+					release();
+					resetHotcue = false;
+				};
+				cocked += 1;
+
+			});
+			expect(field.release, release);
+		};
+
+		return function(channel, held) {
+			comm.sysex(device.modeset.button);
+			tell(device.mode.trig.light.bits(trigset+1));
 			pitchPatch(channel);
 			deckLights();
 
-            var i = 0;
-            var offset = trigset * 5;
-            for (; i < 5; i++) {
-                var hotcue = offset + i + 1;
-                var field = device.field[i];
-                if (held) {
-                    expect(field.touch, setConst(channel, 'hotcue_'+hotcue+'_clear', true));
-                } else {
-                    touchRelease(channel, field, 'hotcue_'+hotcue+'_activate');
-                }
-                watch(channel, 'hotcue_'+hotcue+'_enabled', binarylight(field.light.black, field.light.red));
-            }
-        }
-    }
+			var i = 0;
+			var offset = trigset * 5;
+			for (; i < 5; i++) {
+				var hotcue = offset + i + 1;
+				var field = device.field[i];
+				if (held) {
+					expect(field.touch, setConst(channel, 'hotcue_'+hotcue+'_clear', true));
+				} else {
+					touchRelease(channel, field, 'hotcue_'+hotcue+'_activate');
+				}
+				watch(channel, 'hotcue_'+hotcue+'_enabled', binarylight(field.light.black, field.light.red));
+			}
+		}
+	}
 
 	var autocancel = {};
 	function Autocancel(name, setup, cancel) {
@@ -1103,13 +1103,13 @@ StantonSCS3d.Agent = function(device) {
 		}
 		setup(engage, cancelIfEngaged);
 	}
-    
-    /* Patch the circle for beatmatching.
-     * Sliding on the center bar will temporarily raise or lower the rate by a 
-     * fixed amount. The circle slider functions as a slow jog wheel. 
-     */
-    function vinylpatch(channel, held) {
-        comm.sysex(device.modeset.circle);
+
+	/* Patch the circle for beatmatching.
+	* Sliding on the center bar will temporarily raise or lower the rate by a
+	* fixed amount. The circle slider functions as a slow jog wheel.
+	*/
+	function vinylpatch(channel, held) {
+		comm.sysex(device.modeset.circle);
 		pitchPatch(channel);
 		deckLights();
 
@@ -1121,23 +1121,23 @@ StantonSCS3d.Agent = function(device) {
 			});
 			expect(device.slider.middle.release, cancel);
 		}, function() {
-            engine.setParameter(channel, 'rate_temp_down', false);
-            engine.setParameter(channel, 'rate_temp_up', false);
-        });
+			engine.setParameter(channel, 'rate_temp_down', false);
+			engine.setParameter(channel, 'rate_temp_up', false);
+		});
 
-        watchmulti({
-            'down': [channel, 'rate_temp_down'],
-            'up': [channel, 'rate_temp_up']
-        }, function(values) {
-            var dir = (values.up - values.down) / 2 + 0.5;
-            Centerbar(device.slider.left.meter)(dir-0.1);
-            Centerbar(device.slider.middle.meter)(dir+0.1);
-            Centerbar(device.slider.right.meter)(dir-0.1);
-        });
+		watchmulti({
+			'down': [channel, 'rate_temp_down'],
+			'up': [channel, 'rate_temp_up']
+		}, function(values) {
+			var dir = (values.up - values.down) / 2 + 0.5;
+			Centerbar(device.slider.left.meter)(dir-0.1);
+			Centerbar(device.slider.middle.meter)(dir+0.1);
+			Centerbar(device.slider.right.meter)(dir-0.1);
+		});
 
-        expect(device.slider.circle.slide.rel, function(value) {
-            engine.setParameter(channel, 'jog', (value - 64));
-        });
+		expect(device.slider.circle.slide.rel, function(value) {
+			engine.setParameter(channel, 'jog', (value - 64));
+		});
 
 
 		expect(device.top.left.touch, setConst(channel, 'beatjump_1_backward', 1));
@@ -1152,309 +1152,309 @@ StantonSCS3d.Agent = function(device) {
 			setConst(channel, 'back', 0)();
 			setConst(channel, 'fwd', 0)();
 		});
-    }
-        
-        
-    /* Patch the circle for library browsing
-     * Touching the center bar loads the highlighted track into the deck.
-     * Sliding om the circle changes the highlighted track up or down.
-     * 
-     * Holding the deck button allows changing the active deck by pressing
-     * one of the four buttons around the circle.
-     */
-    function deckpatch(channel, held) {
-        comm.sysex(device.modeset.circle);
+	}
+
+
+	/* Patch the circle for library browsing
+	* Touching the center bar loads the highlighted track into the deck.
+	* Sliding om the circle changes the highlighted track up or down.
+	*
+	* Holding the deck button allows changing the active deck by pressing
+	* one of the four buttons around the circle.
+	*/
+	function deckpatch(channel, held) {
+		comm.sysex(device.modeset.circle);
 		pitchPatch(channel);
 		deckLights();
 
-        if (held) {
-            tell(device.mode.deck.light.purple);
-            var setDeck = function(newDeck) {
-                return function() {
-                    var changed = deck !== newDeck;
-                    if (changed) {
-                        deck = newDeck;
+		if (held) {
+			tell(device.mode.deck.light.purple);
+			var setDeck = function(newDeck) {
+				return function() {
+					var changed = deck !== newDeck;
+					if (changed) {
+						deck = newDeck;
 
-                        // see gleanChannel() for what we're doing here
-                        var deckState = engine.getValue('[PreviewDeck1]', 'quantize');
-                        if (deckState & 0x4) {
-                            var side = deck & 1;
-                            var altBit = 1 << side;
-                            var alt = !!(deck & 2);
+						// see gleanChannel() for what we're doing here
+						var deckState = engine.getValue('[PreviewDeck1]', 'quantize');
+						if (deckState & 0x4) {
+							var side = deck & 1;
+							var altBit = 1 << side;
+							var alt = !!(deck & 2);
 
-                            // shit gives me headaches, so I'm going to leave it like this
-                            deckState = (deckState & ~altBit) | (alt << side);
-                            engine.setValue('[PreviewDeck1]', 'quantize', deckState);
-                        }
-                    }
-                    return changed;
-                }
-            }
-            expect(device.top.left.touch,     repatch(setDeck(0)));
-            expect(device.top.right.touch,    repatch(setDeck(1)));
-            expect(device.bottom.left.touch,  repatch(setDeck(2)));
-            expect(device.bottom.right.touch, repatch(setDeck(3)));
-        } else {
-            tell(device.mode.deck.light.red);
-            expect(device.top.left.touch,     setConst('[Playlist]', 'SelectPrevPlaylist', 1));
-            expect(device.bottom.left.touch,  setConst('[Playlist]', 'SelectNextPlaylist', 1));
-            expect(device.top.right.touch,    setConst('[Playlist]', 'SelectPrevTrack', 1));
-            expect(device.bottom.right.touch, setConst('[Playlist]', 'SelectNextTrack', 1));
-        }
+							// shit gives me headaches, so I'm going to leave it like this
+							deckState = (deckState & ~altBit) | (alt << side);
+							engine.setValue('[PreviewDeck1]', 'quantize', deckState);
+						}
+					}
+					return changed;
+				}
+			}
+			expect(device.top.left.touch,     repatch(setDeck(0)));
+			expect(device.top.right.touch,    repatch(setDeck(1)));
+			expect(device.bottom.left.touch,  repatch(setDeck(2)));
+			expect(device.bottom.right.touch, repatch(setDeck(3)));
+		} else {
+			tell(device.mode.deck.light.red);
+			expect(device.top.left.touch,     setConst('[Playlist]', 'SelectPrevPlaylist', 1));
+			expect(device.bottom.left.touch,  setConst('[Playlist]', 'SelectNextPlaylist', 1));
+			expect(device.top.right.touch,    setConst('[Playlist]', 'SelectPrevTrack', 1));
+			expect(device.bottom.right.touch, setConst('[Playlist]', 'SelectNextTrack', 1));
+		}
 
-        expect(device.slider.middle.release, function() { 
-            engine.setValue(channel, 'LoadSelectedTrack', true);
-        });
+		expect(device.slider.middle.release, function() {
+			engine.setValue(channel, 'LoadSelectedTrack', true);
+		});
 
-        expect(device.slider.circle.slide.rel, function(value) {
-            engine.setValue('[Playlist]', 'SelectTrackKnob', (value - 64));
-        });
-        
-        watch(channel, 'play', function(play) {
-            if (play) {
-                centerlights([
-                    [1,1,1],
-                    [0,1,0],
-                    [0,1,0],
-                    [0,1,0],
-                    [0,1,0],
-                    [0,1,0],
-                    [0,1,0]
-                ], 1);
-            } else {
-                centerlights([
-                    [0,[1,1,1,1,1,1,0,1,1],0],
-                    [1,[1,1,1,1,0,0,1,1,1],1],
-                    [1,[1,1,1,0,0,1,1,1,1],1],
-                    [0,[1,1,0,0,1,1,1,1,1],0],
-                    [0,[1,0,0,1,1,1,1,1,1],0],
-                    [0,[1,0,1,1,1,1,1,1,1],0],
-                    [0,[0,1,1,1,1,1,1,1,1],0]
-                ], 1);
-            }
-        });
-    }
+		expect(device.slider.circle.slide.rel, function(value) {
+			engine.setValue('[Playlist]', 'SelectTrackKnob', (value - 64));
+		});
 
-    var modeMap = {
-        'fx': [fxpatch],
-        'eq': [eqpatch],
-        'loop': [LoopPatch(false), LoopPatch(true)],
-        'trig': [Trigpatch(0), Trigpatch(1), Trigpatch(2)],
-        'vinyl': [vinylpatch],
-        'deck': [deckpatch],
-    }
-    
-
-    // mode for each channel
-    var mode = {
-        0: MultiModeswitch('deck', modeMap),
-        1: MultiModeswitch('deck', modeMap),
-        2: MultiModeswitch('deck', modeMap),
-        3: MultiModeswitch('deck', modeMap)
-    }
-    
-    // Setup a process that keeps sliding a control by a rate that can be changed
-    var Sliding = function(channel, control) {
-        var slidingRate = 0;
-        var budge = function() {
-            if (slidingRate != 0) {
-                engine.setValue(channel, control,
-                    engine.getValue(channel, control)
-                    + slidingRate
-                );
-            }
-        }
-        comm.repeat(budge);
-        return function(newVal) {
-            var initial = slidingRate === 0;
-            slidingRate = newVal;
-            if (initial) budge();
-            
-        }
-    }
-    
-    var pitchModeMap = {
-        rate: function(channel, held) {
-            tell(device.pitch.light.red.on);
-            tell(device.pitch.light.blue.off);
-            watch(channel, 'rate', Centerbar(device.pitch.meter));
-
-            if (held) {
-                expect(device.pitch.slide.abs, reset(channel, 'rate'));
-            } else {
-                var setRate = Sliding(channel, 'rate');
-                expect(device.pitch.slide.abs, function(value) { 
-                    var rate = (value - 63) / 32;
-                    var sign = rate > 0 ? 1 : -1;
-                    setRate(
-                        sign
-                        * 0.01
-                        * Math.pow(Math.abs(rate), 3)
-                    );
-                });
-                expect(device.pitch.release, function(value) { 
-                    setRate(0);
-                });
-            }
-        },
-        absrate: function(channel, held) {
-            tell(device.pitch.light.red.on);
-            tell(device.pitch.light.blue.on);
-            watch(channel, 'rate', Centerbar(device.pitch.meter));
-
-            if (held) {
-                expect(device.pitch.slide.abs, reset(channel, 'rate'));
-            } else {
-                expect(device.pitch.slide.abs, set(channel, 'rate'));
-            }
-        },
-        pitch: function(channel, held) {
-            tell(device.pitch.light.red.off);
-            tell(device.pitch.light.blue.on);
-            watch(channel, 'pitch', Centerbar(device.pitch.meter));
-
-            if (held) {
-                expect(device.pitch.slide.rel, reset(channel, 'pitch'));
-            } else {
-                expect(device.pitch.slide.rel, budge(channel, 'pitch'));
-            }
-        },
-        abspitch: function(channel, held) {
-            tell(device.pitch.light.red.off);
-            tell(device.pitch.light.blue.off);
-            watch(channel, 'pitch', Centerbar(device.pitch.meter));
-
-            if (held) {
-                expect(device.pitch.slide.rel, reset(channel, 'pitch'));
-            } else {
-                expect(device.pitch.slide.abs, set(channel, 'pitch'));
-            }
-        }
-    };
-
-    // pitch slider mode per channel
-    var pitchMode = {
-        0: Modeswitch('rate', pitchModeMap),
-        1: Modeswitch('rate', pitchModeMap),
-        2: Modeswitch('rate', pitchModeMap),
-        3: Modeswitch('rate', pitchModeMap)
-    }
-
-	var pitchPatch = function(channel) {
-        var activePitchMode = pitchMode[deck];
-        activePitchMode.patch()(channel, mode[deck].held() === 'vinyl');
+		watch(channel, 'play', function(play) {
+			if (play) {
+				centerlights([
+					[1,1,1],
+					[0,1,0],
+					[0,1,0],
+					[0,1,0],
+					[0,1,0],
+					[0,1,0],
+					[0,1,0]
+				], 1);
+			} else {
+				centerlights([
+					[0,[1,1,1,1,1,1,0,1,1],0],
+					[1,[1,1,1,1,0,0,1,1,1],1],
+					[1,[1,1,1,0,0,1,1,1,1],1],
+					[0,[1,1,0,0,1,1,1,1,1],0],
+					[0,[1,0,0,1,1,1,1,1,1],0],
+					[0,[1,0,1,1,1,1,1,1,1],0],
+					[0,[0,1,1,1,1,1,1,1,1],0]
+				], 1);
+			}
+		});
 	}
 
-    function patchage() {
-        tell(device.logo.on);
+	var modeMap = {
+		'fx': [fxpatch],
+		'eq': [eqpatch],
+		'loop': [LoopPatch(false), LoopPatch(true)],
+		'trig': [Trigpatch(0), Trigpatch(1), Trigpatch(2)],
+		'vinyl': [vinylpatch],
+		'deck': [deckpatch],
+	}
 
-        var channelno = deck + 1;
-        var channel = '[Channel'+channelno+']';
 
-        tell(device.decklight[0](!(deck & 1)));
-        tell(device.decklight[1](deck & 1));
+	// mode for each channel
+	var mode = {
+		0: MultiModeswitch('deck', modeMap),
+		1: MultiModeswitch('deck', modeMap),
+		2: MultiModeswitch('deck', modeMap),
+		3: MultiModeswitch('deck', modeMap)
+	}
 
-        expect(device.gain.slide.abs, set(channel, 'volume'));
-        watch(channel, 'volume', Bar(device.gain.meter));
+	// Setup a process that keeps sliding a control by a rate that can be changed
+	var Sliding = function(channel, control) {
+		var slidingRate = 0;
+		var budge = function() {
+			if (slidingRate != 0) {
+				engine.setValue(channel, control,
+					engine.getValue(channel, control)
+					+ slidingRate
+				);
+			}
+		}
+		comm.repeat(budge);
+		return function(newVal) {
+			var initial = slidingRate === 0;
+			slidingRate = newVal;
+			if (initial) budge();
+
+		}
+	}
+
+	var pitchModeMap = {
+		rate: function(channel, held) {
+			tell(device.pitch.light.red.on);
+			tell(device.pitch.light.blue.off);
+			watch(channel, 'rate', Centerbar(device.pitch.meter));
+
+			if (held) {
+				expect(device.pitch.slide.abs, reset(channel, 'rate'));
+			} else {
+				var setRate = Sliding(channel, 'rate');
+				expect(device.pitch.slide.abs, function(value) {
+					var rate = (value - 63) / 32;
+					var sign = rate > 0 ? 1 : -1;
+					setRate(
+						sign
+						* 0.01
+						* Math.pow(Math.abs(rate), 3)
+					);
+				});
+				expect(device.pitch.release, function(value) {
+					setRate(0);
+				});
+			}
+		},
+		absrate: function(channel, held) {
+			tell(device.pitch.light.red.on);
+			tell(device.pitch.light.blue.on);
+			watch(channel, 'rate', Centerbar(device.pitch.meter));
+
+			if (held) {
+				expect(device.pitch.slide.abs, reset(channel, 'rate'));
+			} else {
+				expect(device.pitch.slide.abs, set(channel, 'rate'));
+			}
+		},
+		pitch: function(channel, held) {
+			tell(device.pitch.light.red.off);
+			tell(device.pitch.light.blue.on);
+			watch(channel, 'pitch', Centerbar(device.pitch.meter));
+
+			if (held) {
+				expect(device.pitch.slide.rel, reset(channel, 'pitch'));
+			} else {
+				expect(device.pitch.slide.rel, budge(channel, 'pitch'));
+			}
+		},
+		abspitch: function(channel, held) {
+			tell(device.pitch.light.red.off);
+			tell(device.pitch.light.blue.off);
+			watch(channel, 'pitch', Centerbar(device.pitch.meter));
+
+			if (held) {
+				expect(device.pitch.slide.rel, reset(channel, 'pitch'));
+			} else {
+				expect(device.pitch.slide.abs, set(channel, 'pitch'));
+			}
+		}
+	};
+
+	// pitch slider mode per channel
+	var pitchMode = {
+		0: Modeswitch('rate', pitchModeMap),
+		1: Modeswitch('rate', pitchModeMap),
+		2: Modeswitch('rate', pitchModeMap),
+		3: Modeswitch('rate', pitchModeMap)
+	}
+
+	var pitchPatch = function(channel) {
+		var activePitchMode = pitchMode[deck];
+		activePitchMode.patch()(channel, mode[deck].held() === 'vinyl');
+	}
+
+	function patchage() {
+		tell(device.logo.on);
+
+		var channelno = deck + 1;
+		var channel = '[Channel'+channelno+']';
+
+		tell(device.decklight[0](!(deck & 1)));
+		tell(device.decklight[1](deck & 1));
+
+		expect(device.gain.slide.abs, set(channel, 'volume'));
+		watch(channel, 'volume', Bar(device.gain.meter));
 
 		for (name in autocancel) {
 			autocancel[name]();
 		}
 		autocancel = {};
-        if (resetHotcue) resetHotcue();
+		if (resetHotcue) resetHotcue();
 
-        var activeMode = mode[deck];
+		var activeMode = mode[deck];
 
-        tell(device.mode.fx.light.black);
-        tell(device.mode.eq.light.black);
-        tell(device.mode.loop.light.black);
-        tell(device.mode.trig.light.black);
-        tell(device.mode.vinyl.light.black);
-        tell(device.mode.deck.light.black);
-        tell(device.mode[activeMode.engaged()].light.red);
-        if (activeMode.held()) tell(device.mode[activeMode.held()].light.purple);
-        expect(device.mode.fx.touch,   repatch(activeMode.hold('fx')));
-        expect(device.mode.fx.release, repatch(activeMode.release('fx')));
-        expect(device.mode.eq.touch,   repatch(activeMode.hold('eq')));
-        expect(device.mode.eq.release, repatch(activeMode.release('eq')));
-        expect(device.mode.loop.touch,   repatch(activeMode.hold('loop')));
-        expect(device.mode.loop.release, repatch(activeMode.release('loop')));
-        expect(device.mode.trig.touch,   repatch(activeMode.hold('trig')));
-        expect(device.mode.trig.release, repatch(activeMode.release('trig')));
-        expect(device.mode.vinyl.touch,   repatch(activeMode.hold('vinyl')));
-        expect(device.mode.vinyl.release, repatch(activeMode.release('vinyl')));
-        expect(device.mode.deck.touch, repatch(activeMode.hold('deck')));
-        expect(device.mode.deck.release, repatch(activeMode.release('deck')));
-        
-        // Reset circle lights
-        Bar(device.slider.circle.meter)(0);
-        Bar(device.slider.left.meter)(0);
-        Bar(device.slider.middle.meter)(0);
-        Bar(device.slider.right.meter)(0);
-        
-        // Call the patch function for the active mode
-        activeMode.active()(channel, activeMode.held());
+		tell(device.mode.fx.light.black);
+		tell(device.mode.eq.light.black);
+		tell(device.mode.loop.light.black);
+		tell(device.mode.trig.light.black);
+		tell(device.mode.vinyl.light.black);
+		tell(device.mode.deck.light.black);
+		tell(device.mode[activeMode.engaged()].light.red);
+		if (activeMode.held()) tell(device.mode[activeMode.held()].light.purple);
+		expect(device.mode.fx.touch,   repatch(activeMode.hold('fx')));
+		expect(device.mode.fx.release, repatch(activeMode.release('fx')));
+		expect(device.mode.eq.touch,   repatch(activeMode.hold('eq')));
+		expect(device.mode.eq.release, repatch(activeMode.release('eq')));
+		expect(device.mode.loop.touch,   repatch(activeMode.hold('loop')));
+		expect(device.mode.loop.release, repatch(activeMode.release('loop')));
+		expect(device.mode.trig.touch,   repatch(activeMode.hold('trig')));
+		expect(device.mode.trig.release, repatch(activeMode.release('trig')));
+		expect(device.mode.vinyl.touch,   repatch(activeMode.hold('vinyl')));
+		expect(device.mode.vinyl.release, repatch(activeMode.release('vinyl')));
+		expect(device.mode.deck.touch, repatch(activeMode.hold('deck')));
+		expect(device.mode.deck.release, repatch(activeMode.release('deck')));
 
-        expect(device.button.play.touch, toggle(channel, 'play'));
-        watchmulti({
-            play: [channel, 'play'],
-            position: [channel, 'playposition'],
-            duration: [channel, 'duration']
-        }, function(values) {
-            tell(device.button.play.light[values.play ? 'red' : 'black']);
-            if (!values.play && values.position < 1 && values.duration > 0) {
-                comm.mask(device.button.play.light.red, blinken.ready, true);
-            } else {
-                comm.unmask(device.button.play.light.red);
-            }
-        });
+		// Reset circle lights
+		Bar(device.slider.circle.meter)(0);
+		Bar(device.slider.left.meter)(0);
+		Bar(device.slider.middle.meter)(0);
+		Bar(device.slider.right.meter)(0);
 
-        expect(device.button.cue.touch, setConst(channel, 'cue_default', true));
-        expect(device.button.cue.release, setConst(channel, 'cue_default', false));
-        watch(channel, 'cue_default', binarylight(device.button.cue.light.black, device.button.cue.light.red));
-        
-        expect(device.button.sync.touch, setConst(channel, 'beatsync', true));
-        tell(device.button.sync.light.black);
-        
-        expect(device.button.tap.touch, function() { taps(channel); });
-        watch(channel, 'beat_active', binarylight(device.button.tap.light.black, device.button.tap.light.red));
+		// Call the patch function for the active mode
+		activeMode.active()(channel, activeMode.held());
 
-        spinLight(channel, 30);
+		expect(device.button.play.touch, toggle(channel, 'play'));
+		watchmulti({
+			play: [channel, 'play'],
+			position: [channel, 'playposition'],
+			duration: [channel, 'duration']
+		}, function(values) {
+			tell(device.button.play.light[values.play ? 'red' : 'black']);
+			if (!values.play && values.position < 1 && values.duration > 0) {
+				comm.mask(device.button.play.light.red, blinken.ready, true);
+			} else {
+				comm.unmask(device.button.play.light.red);
+			}
+		});
 
-        // Read deck state from unrelated control which may be set by the 3m
-        // Among all the things WRONG about this, two stand out:
-        // 1. The control is not meant to transmit this information.
-        // 2. A value > 1 is expected from a control which is just a toggle (suggesting a binary value)
-        // This may fail at any future or past version of Mixxx and you have only me to blame for it.
-        watch('[PreviewDeck1]', 'quantize', repatch(gleanChannel));
-    }
+		expect(device.button.cue.touch, setConst(channel, 'cue_default', true));
+		expect(device.button.cue.release, setConst(channel, 'cue_default', false));
+		watch(channel, 'cue_default', binarylight(device.button.cue.light.black, device.button.cue.light.red));
 
-    var timer = false;
+		expect(device.button.sync.touch, setConst(channel, 'beatsync', true));
+		tell(device.button.sync.light.black);
 
-    return {
-        start: function() {
-            // Tell it to use channel 0 and set it to flat mode
-            comm.sysex(device.modeset.channel); 
-            comm.sysex(device.modeset.flat);
+		expect(device.button.tap.touch, function() { taps(channel); });
+		watch(channel, 'beat_active', binarylight(device.button.tap.light.black, device.button.tap.light.red));
 
-            // Initial setup
-            patchage();
-            if (!timer) timer = engine.beginTimer(100, comm.tick);
-        },
-        receive: comm.receive,
-        stop: function() {
-            // No need for stopTimer() because it's done automatically
-            
-            // Forget all mods
-            comm.clear();
-            
-            // Send off-message to all light addresses 
-            var i = 0;
-            for (; i < 0x80; i++) {
-                tell([0x90, i, 0]);
-            }
-            tell(device.logo.on); // Turn the logo back on
-            comm.tick(); // The last tick, causes sending of messages
-        }
-    }
+		spinLight(channel, 30);
+
+		// Read deck state from unrelated control which may be set by the 3m
+		// Among all the things WRONG about this, two stand out:
+		// 1. The control is not meant to transmit this information.
+		// 2. A value > 1 is expected from a control which is just a toggle (suggesting a binary value)
+		// This may fail at any future or past version of Mixxx and you have only me to blame for it.
+		watch('[PreviewDeck1]', 'quantize', repatch(gleanChannel));
+	}
+
+	var timer = false;
+
+	return {
+		start: function() {
+			// Tell it to use channel 0 and set it to flat mode
+			comm.sysex(device.modeset.channel);
+			comm.sysex(device.modeset.flat);
+
+			// Initial setup
+			patchage();
+			if (!timer) timer = engine.beginTimer(100, comm.tick);
+		},
+		receive: comm.receive,
+		stop: function() {
+			// No need for stopTimer() because it's done automatically
+
+			// Forget all mods
+			comm.clear();
+
+			// Send off-message to all light addresses
+			var i = 0;
+			for (; i < 0x80; i++) {
+				tell([0x90, i, 0]);
+			}
+			tell(device.logo.on); // Turn the logo back on
+			comm.tick(); // The last tick, causes sending of messages
+		}
+	}
 }
