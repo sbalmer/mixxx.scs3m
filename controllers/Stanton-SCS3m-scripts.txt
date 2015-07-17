@@ -17,6 +17,15 @@ side, touching "B D" will switch between decks 2 and 4. All controls except for
 the crossfader then control the selected deck.
 
 
+EQ mode
+-------
+
+This is the standard mixing mde where the three EQ sliders control low/mid/high.
+The top slider controls the filter knob.
+
+Holding EQ and touching a slider will reset it to its preset position. (Unfortunately this doesn't work yet for FX and MASTER modes.)
+
+
 
 Holding FX
 ----------
@@ -27,14 +36,6 @@ Gain slider: controls channel pre-gain in relative mode
 Buttons: The four buttons toggle assignement to FX chains (See FX modes)
 Crossfader: Needle drop, absolute jump to the track location where you touch the crossfader
 
-
-EQ mode
--------
-
-This is the standard mixing mde where the three EQ sliders control low/mid/high.
-The top slider controls the filter knob.
-
-Holding EQ and touching a slider will reset it to its preset position. (Unfortunately this doesn't work yet for FX and MASTER modes.)
 
 
 FX modes
@@ -55,3 +56,4 @@ Left top slider: Pre/main mix on headphone
 Right top slider: main balance
 Left slider: head gain
 Right slider: master gain
+Buttons: The buttons assign effects to head and master
