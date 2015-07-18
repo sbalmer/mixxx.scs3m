@@ -27,11 +27,14 @@ See DECK mode on how to control this.
 FX mode
 -------
 
-FX mode allows you to control effects. Button B11 through B14 allow you to select the currently controlled chain. (Specifically, the first effect of each chain in the first effect rack is controlled.) The currently active effect is show in red.
+FX mode allows you to control effects. Button B11 through B14 allow you to select the currently controlled chain. (Specifically, the first effect of each chain in the first effect rack is controlled.) The currently active effect is shown in red. The buttons
+turn blue when the active channel is assigned to this effect chain. If the active effect chain is assigned to the active deck, the button will purple.
 
 Slider S2 controls the wet/dry mix of the current effect. Sliders S3, S4, and S5 control the first three effect knobs on the effect unit.
 
-By holding FX, you can toggle assignement of the current channel to effect chains with buttons B11 through B14. The effects that have the current channel assigned are shown in blue. While FX is held, the currently active channel is shown in red.
+By holding FX, you can toggle assignement of the current channel to effect chains with buttons B11 through B14. The effects that have the current channel assigned are shown in blue. While FX is held, the pith mode slider can be used to load to the next (top half of the slider) or previous (bottom half) effect chain.
+
+As a little help, when FX is held, the button for the active channel is shown in red. So if you want to assign the active effect to the active channel, press the button that is red. If the button is purple, pressing it would mean unassign the active effect from the active channel.
 
 
 

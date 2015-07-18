@@ -574,6 +574,19 @@ StantonSCS3d.Agent = function(device) {
 		return function() { return constant; }
 	}
 
+	// Light leds according to function
+	function lightsmask(lights, maskfunc) {
+		for (nr in lights) {
+			var mask = function(nr) {
+				return function(value, ticks) {
+					return maskfunc(lights.length, nr, value, ticks);
+				}
+			}(nr);
+			var light = lights[lights.length - 1 - nr];
+			comm.mask(light, mask, true);
+		}
+	}
+
 	// Light leds in the circle according to pattern
 	// Pattern is a two-dimensional array 3 x 7 of bools
 	function centerlights(pattern, rate) {
@@ -883,11 +896,26 @@ StantonSCS3d.Agent = function(device) {
 			expect(device.slider.middle.slide.abs, set(effectunit_effect, 'parameter2'));
 			expect(device.slider.right.slide.abs, set(effectunit_effect, 'parameter3'));
 
-			// Pitch slider controls wetness
-			tell(device.pitch.light.red.off);
-			tell(device.pitch.light.blue.off);
-			watch(effectunit, 'mix', Bar(device.pitch.meter));
-			expect(device.pitch.slide.abs, set(effectunit, 'mix'));
+			if (held) {
+				// change effect when slider is touched
+				expect(device.pitch.release, function(value) {
+					setConst(effectunit, 'chain_selector', value > 64 ? 1 : -1)();
+				});
+
+				Bar(device.pitch.meter)(0); // Turn off pitch bar lights
+				lightsmask(device.pitch.meter, function(count, nr, value, ticks) {
+					var range = (count) / 2;
+					var center = Math.round(count / 2) - 1; // Zero-based
+					var lighted = Math.abs(nr - center) == ticks % range;
+					return lighted ? !value : value;
+				});
+			} else {
+				// Pitch slider controls wetness
+				tell(device.pitch.light.red.off);
+				tell(device.pitch.light.blue.off);
+				watch(effectunit, 'mix', Bar(device.pitch.meter));
+				expect(device.pitch.slide.abs, set(effectunit, 'mix'));
+			}
 
 			// Button light color:
 			// When effect is assigned to deck: blue
