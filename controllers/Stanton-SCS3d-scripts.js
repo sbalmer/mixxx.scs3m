@@ -958,14 +958,16 @@ StantonSCS3d.Agent = function(device) {
 		comm.sysex(device.modeset.slider);
 		tell(device.mode.eq.light.red);
 		pitchPatch(channel);
-		watch(channel, 'filterLow', Centerbar(device.slider.left.meter));
-		watch(channel, 'filterMid', Centerbar(device.slider.middle.meter));
-		watch(channel, 'filterHigh', Centerbar(device.slider.right.meter));
+
+		var eff = "[EqualizerRack1_" + channel + "_Effect1]";
+		watch(eff, 'parameter1', Centerbar(device.slider.left.meter));
+		watch(eff, 'parameter2', Centerbar(device.slider.middle.meter));
+		watch(eff, 'parameter3', Centerbar(device.slider.right.meter));
 
 		var op = held ? reset : set;
-		expect(device.slider.left.slide.abs, op(channel, 'filterLow'));
-		expect(device.slider.middle.slide.abs, op(channel, 'filterMid'));
-		expect(device.slider.right.slide.abs, op(channel, 'filterHigh'));
+		expect(device.slider.left.slide.abs, op(eff, 'parameter1'));
+		expect(device.slider.middle.slide.abs, op(eff, 'parameter2'));
+		expect(device.slider.right.slide.abs, op(eff, 'parameter3'));
 
 		if (held) {
 			var activePitchMode = pitchMode[deck];

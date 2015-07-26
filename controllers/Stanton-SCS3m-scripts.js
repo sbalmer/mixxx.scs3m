@@ -1,7 +1,6 @@
 "use strict";
 
 // issues:
-// - filterHigh/Mid/Low is deprecated, what is the replacement?
 // - On FX-EQ, gain should reset pregain, crossfader should drop needle at beginning of track
 // - blink EQ when not zeroed?
 // - blink FX when one is engaged?
@@ -560,21 +559,15 @@ StantonSCS3m.Agent = function(device) {
 			}
 
 			if (sideoverlay.engaged('eq')) {
-				expect(part.eq.high.slide, eqsideheld.choose(
-					set(channel, 'filterHigh'),
-					reset(channel, 'filterHigh')
-				));
-				expect(part.eq.mid.slide, eqsideheld.choose(
-					set(channel, 'filterMid'),
-					reset(channel, 'filterMid')
-				));
-				expect(part.eq.low.slide, eqsideheld.choose(
-					set(channel, 'filterLow'),
-					reset(channel, 'filterLow')
-				));
-				watch(channel, 'filterHigh',patch(offcenter(part.eq.high.meter.centerbar)));
-				watch(channel, 'filterMid', patch(offcenter(part.eq.mid.meter.centerbar)));
-				watch(channel, 'filterLow', patch(offcenter(part.eq.low.meter.centerbar)));
+				var eff = "[EqualizerRack1_" + channel + "_Effect1]";
+				var op = eqsideheld.choose(set, reset);
+				expect(part.eq.high.slide, op(eff, 'parameter1'));
+				expect(part.eq.mid.slide, op(eff, 'parameter2'));
+				expect(part.eq.low.slide, op(eff, 'parameter3'));
+
+				watch(eff, 'parameter1',patch(offcenter(part.eq.high.meter.centerbar)));
+				watch(eff, 'parameter2', patch(offcenter(part.eq.mid.meter.centerbar)));
+				watch(eff, 'parameter3', patch(offcenter(part.eq.low.meter.centerbar)));
 			}
 
 			expect(part.modes.eq.touch, repatch(function() {
