@@ -662,13 +662,11 @@ StantonSCS3d.Agent = function(device) {
 			// Because the seconds are not rate-corrected, we must scale
 			// warnDuration according to pitch rate.
 			var scaledWarnDuration = warnDuration + warnDuration * ((values.rate - 0.5) * 2 * values.range);
-
 			var warnPos = false;
 			if (playable && left < scaledWarnDuration) {
 				// Add a blinking light that runs a tad slower so the needle
 				// will reach it when the track runs out
-				var warnLight = (needle + (left / scaledWarnDuration)) % 1;
-				warnPos = count - Math.floor(warnLight * count) - 1;
+				var warnPos = (pos + count - Math.ceil(count * (left / scaledWarnDuration))) % count;
 			}
 
 			var i = 0;
