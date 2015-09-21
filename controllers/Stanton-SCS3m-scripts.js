@@ -4,14 +4,14 @@
 // - On FX-EQ, gain should reset pregain, crossfader should drop needle at beginning of track
 // - blink EQ when not zeroed?
 // - blink FX when one is engaged?
+// - Having needledrop on the crossfader can cause inadvertent skips when
+//   FX is used to change other settings and the crossfader is held
 
 // manually test messages
 // amidi -p hw:1 -S F00001601501F7 # flat mode
 // amidi -p hw:1 -S 900302 # 90: note on, 03: id of a touch button, 02: red LED
 
-StantonSCS3m = {
-	timer: false
-}
+StantonSCS3m = {}
 
 StantonSCS3m.init = function(id) {
 	this.device = this.Device();

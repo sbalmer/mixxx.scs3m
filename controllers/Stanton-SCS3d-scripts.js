@@ -666,7 +666,8 @@ StantonSCS3d.Agent = function(device) {
 			if (playable && left < scaledWarnDuration) {
 				// Add a blinking light that runs a tad slower so the needle
 				// will reach it when the track runs out
-				var warnPos = (pos + count - Math.ceil(count * (left / scaledWarnDuration))) % count;
+				var warnOffset = count - Math.floor(count * (left / scaledWarnDuration));
+				var warnPos = (pos + warnOffset) % count;
 			}
 
 			var i = 0;
