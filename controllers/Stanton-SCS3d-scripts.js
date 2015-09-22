@@ -1034,9 +1034,42 @@ StantonSCS3d.Agent = function(device) {
 
 				if (rolling) {
 					expect(device.slider.circle.release, cancel);
-				} else {
-					expect(device.slider.middle.release, cancel);
 				}
+				expect(device.slider.middle.release, cancel);
+
+
+				watchmulti({
+					enabled: [channel, 'loop_enabled'],
+					position: [channel, 'playposition'],
+					start: [channel, 'loop_start_position'],
+					end: [channel, 'loop_end_position'],
+					samples: [channel, 'track_samples']
+				}, function(values) {
+					if (values.enabled) {
+						var samplepos = values.position * values.samples;
+						var pos = Math.floor((samplepos - values.start) / (values.end - values.start) * 8);
+						centerlights([
+							[0,0,0],
+							[0,pos==0?0:1,0],
+							[pos==7?0:1,0,pos==1?0:1],
+							[pos==6?0:1,0,pos==2?0:1],
+							[pos==5?0:1,0,pos==3?0:1],
+							[0,pos==4?0:1,0],
+							[0,0,0]
+						], 2);
+					} else {
+						centerlights([
+							[0,0,0],
+							[0,0,0],
+							[1,0,rolling?0:1],
+							[1,1,1],
+							[1,0,rolling?0:1],
+							[0,0,0],
+							[0,0,0]
+						], 2);
+					}
+				});
+
 			};
 			var cancel = setConst(channel, 'reloop_exit', 1);
 
@@ -1121,6 +1154,17 @@ StantonSCS3d.Agent = function(device) {
 				}
 				watch(channel, 'hotcue_'+hotcue+'_enabled', binarylight(field.light.black, field.light.red));
 			}
+
+			var t = held ? [1,0] : 1;
+			centerlights([
+				[0,0,0],
+				[t,trigset==2?t:0,t],
+				[0,trigset==1?t:0,0],
+				[0,t,0],
+				[0,trigset==1?t:0,0],
+				[t,trigset==2?t:0,t],
+				[0,0,0]
+			], 1);
 		}
 	}
 
