@@ -896,8 +896,11 @@ StantonSCS3d.Agent = function(device) {
 
 			if (held) {
 				// change effect when slider is touched
-				expect(device.pitch.release, function(value) {
-					setConst(effectunit, 'chain_selector', value > 64 ? 1 : -1)();
+				// Because the slider release does not tell us where it was released, we read the direction from the slide events
+				var direction = 1;
+				expect(device.pitch.slide.abs, function(value) { direction = value < 64 ? 1 : -1; });
+				expect(device.pitch.release, function() {
+					setConst(effectunit, 'chain_selector', direction)();
 				});
 
 				Bar(device.pitch.meter)(0); // Turn off pitch bar lights
