@@ -977,23 +977,8 @@ StantonSCS3d.Agent = function(device) {
 		expect(device.slider.middle.slide.abs, op(eff, 'parameter2'));
 		expect(device.slider.right.slide.abs, op(eff, 'parameter3'));
 
-		if (held) {
-			var activePitchMode = pitchMode[deck];
-			var engagedMode = activePitchMode.engaged();
-			var pitchButtons = {
-				'rate': device.top.left,
-				'pitch': device.top.right,
-				'absrate': device.bottom.left,
-				'abspitch': device.bottom.right,
-			}
-			for (modeName in pitchButtons) {
-				var pitchButton = pitchButtons[modeName];
-				expect(pitchButton.touch, repatch(activePitchMode.engage(modeName)));
-				tell(pitchButton.light[engagedMode === modeName ? 'blue' : 'black']);
-			}
-		} else {
-			deckLights();
-		}
+
+		deckLights();
 	}
 
 	function LoopPatch(rolling) {
@@ -1194,7 +1179,13 @@ StantonSCS3d.Agent = function(device) {
 	function vinylpatch(channel, held) {
 		comm.sysex(device.modeset.circle);
 		pitchPatch(channel);
-		deckLights();
+
+		// The four buttons select pitch slider mode when vinyl is held
+		if (held) {
+			pitchModeSelect();
+		} else {
+			deckLights();
+		}
 
 		Autocancel('temprate', function(engage, cancel) {
 			expect(device.slider.middle.slide.abs, function(value) {
@@ -1356,10 +1347,26 @@ StantonSCS3d.Agent = function(device) {
 		}
 	}
 
+	var pitchModeSelect = function() {
+		var activePitchMode = pitchMode[deck];
+		var engagedMode = activePitchMode.engaged();
+		var pitchButtons = {
+			'absrate': device.top.left,
+			'pitch': device.top.right,
+			'rate': device.bottom.left,
+			'relpitch': device.bottom.right,
+		}
+		for (modeName in pitchButtons) {
+			var pitchButton = pitchButtons[modeName];
+			expect(pitchButton.touch, repatch(activePitchMode.engage(modeName)));
+			tell(pitchButton.light[engagedMode === modeName ? 'blue' : 'black']);
+		}
+	}
+
 	var pitchModeMap = {
 		rate: function(channel, held) {
 			tell(device.pitch.light.red.on);
-			tell(device.pitch.light.blue.off);
+			tell(device.pitch.light.blue.on);
 			watch(channel, 'rate', Centerbar(device.pitch.meter));
 
 			if (held) {
@@ -1382,7 +1389,7 @@ StantonSCS3d.Agent = function(device) {
 		},
 		absrate: function(channel, held) {
 			tell(device.pitch.light.red.on);
-			tell(device.pitch.light.blue.on);
+			tell(device.pitch.light.blue.off);
 			watch(channel, 'rate', Centerbar(device.pitch.meter));
 
 			if (held) {
@@ -1391,9 +1398,9 @@ StantonSCS3d.Agent = function(device) {
 				expect(device.pitch.slide.abs, set(channel, 'rate'));
 			}
 		},
-		pitch: function(channel, held) {
+		relpitch: function(channel, held) {
 			tell(device.pitch.light.red.off);
-			tell(device.pitch.light.blue.on);
+			tell(device.pitch.light.blue.off);
 			watch(channel, 'pitch', Centerbar(device.pitch.meter));
 
 			if (held) {
@@ -1402,25 +1409,28 @@ StantonSCS3d.Agent = function(device) {
 				expect(device.pitch.slide.rel, budge(channel, 'pitch'));
 			}
 		},
-		abspitch: function(channel, held) {
+		pitch: function(channel, held) {
 			tell(device.pitch.light.red.off);
-			tell(device.pitch.light.blue.off);
+			tell(device.pitch.light.blue.on);
 			watch(channel, 'pitch', Centerbar(device.pitch.meter));
-
 			if (held) {
 				expect(device.pitch.slide.rel, reset(channel, 'pitch'));
 			} else {
-				expect(device.pitch.slide.abs, set(channel, 'pitch'));
+				var direction = 1;
+				expect(device.pitch.slide.abs, function(val) { direction = val < 64 ? -1 : 1 });
+				expect(device.pitch.release, function() {
+					engine.setValue(channel, 'pitch', Math.round(engine.getValue(channel, 'pitch') + direction ));
+				});
 			}
 		}
 	};
 
 	// pitch slider mode per channel
 	var pitchMode = {
-		0: Modeswitch('rate', pitchModeMap),
-		1: Modeswitch('rate', pitchModeMap),
-		2: Modeswitch('rate', pitchModeMap),
-		3: Modeswitch('rate', pitchModeMap)
+		0: Modeswitch('absrate', pitchModeMap),
+		1: Modeswitch('absrate', pitchModeMap),
+		2: Modeswitch('absrate', pitchModeMap),
+		3: Modeswitch('absrate', pitchModeMap)
 	}
 
 	var pitchPatch = function(channel) {

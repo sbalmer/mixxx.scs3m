@@ -44,13 +44,7 @@ EQ mode
 In EQ mode, the central sliders S3, S4, S5 control low/mid/high filters. Holding
 EQ will reset the control to center when the corresponding slider is touched.
 
-While EQ is held, B11 through B14 set the pitch slider mode, the
-currently active mode lights blue:
-B11 Rate: Change the right up or down by holding the slider off-center.
-          The further from the center you hold the slider, the faster the rate changes.
-B13 Absolute rate: The pitch slider directly sets the rate in a wide range
-B12 Pitch: Change pitch by sliding up or down
-B14 Absolute pitch: jump to a pitch by touching the slider
+
 
 
 LOOP mode
@@ -86,7 +80,13 @@ The center slider S4 can be used to raise and lower speed by holding it above or
 B11 jumps back one beat, B12 jumps forward. B13 and B14 control fast-reverse,
 fast-forward.
 
-
+While VINYL is held, B11 through B14 set the pitch slider mode, the
+currently active mode lights blue:
+B11 Absolute rate: The pitch slider directly sets the rate in a wide range
+B12 Discrete Pitch: Change pitch up or down by touching upper or lower part of slider
+B13 Rate: Change the right up or down by holding the slider off-center.
+          The further from the center you hold the slider, the faster the rate changes.
+B14 Relative pitch: slide to change pitch up or down
 
 DECK mode
 ---------
