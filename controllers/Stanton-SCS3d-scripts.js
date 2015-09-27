@@ -998,6 +998,8 @@ StantonSCS3d.Agent = function(device) {
 					var exp = Math.ceil(Math.max(-5, Math.min(6, lr / 8)));
 					var len = lengths[4 + exp]; // == Math.pow(2, exp);
 
+					if (len == undefined) return;
+
 					if (rolling) {
 						set(channel, 'beatlooproll_'+len+'_activate')(true);
 						engage();
