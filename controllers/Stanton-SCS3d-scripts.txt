@@ -22,6 +22,8 @@ A light spinning around the circle shows the track is playing. When the track
 nears its end (at -30 seconds), a blinking light will detach and run slower.
 When the spinning light reaches the blinking light, the track ends.
 
+Pressing PLAY will start or pause the track. When a track is ready to play the button blinks. Pressing CUE will jump to the cue point or set it, depending on your settings and whether the track is playing. Pressing SYNC will sync the active deck to another deck. Holding SYNC for more than one second will enable SYNC lock. Pressing TAP repeatedly will adjust track BPM.
+
 
 FX mode
 -------

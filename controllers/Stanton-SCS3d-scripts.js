@@ -819,6 +819,19 @@ StantonSCS3d.Agent = function(device) {
 		}
 	}
 
+
+	var ExpectHeld = function(ctrl, whenShort, whenHeld) {
+		var lastHold = 0;
+		expect(ctrl.touch, function() { lastHold = new Date().getTime(); });
+		expect(ctrl.release, function(val) {
+			if (new Date().getTime() > lastHold + 1000) {
+				return whenHeld(val);
+			} else {
+				return whenShort(val);
+			}
+		});
+	}
+
 	// The current deck
 	// Deck 1: 0b00
 	// Deck 2: 0b01
@@ -1164,8 +1177,21 @@ StantonSCS3d.Agent = function(device) {
 		}
 	}
 
+	// On mode switch, temporary loops and rate changes must be canceled
+	// This dictionary keeps the canceling callbacks
 	var autocancel = {};
+
+	// Registrar for modes that have temporary states to be canceled on mode changes
+	// Arguments:
+	// name: register autocanceling under this name
+	//       Only the last canceling operation registered under this name will be called
+	// setup: setup function that configures the mode
+	//        this functions gets passed two arguments: engage and cancelIfEngaged.
+	//        when the temp mode is activated, setup should call engage()
+	//        when the temp mode should be canceled, cancelIfEngaged() which in turn will call the cancel callback passed to the registrar if (and only if) the temp mode was activated.
+	// cancel: function to call to cancel the temp mode
 	function Autocancel(name, setup, cancel) {
+		// Nausea: The feeling you're implementing overcomplicated logic
 		var engage = function() { autocancel[name] = cancel; };
 		var cancelIfEngaged = function() {
 			if (autocancel[name]) autocancel[name]();
@@ -1508,8 +1534,16 @@ StantonSCS3d.Agent = function(device) {
 		expect(device.button.cue.release, setConst(channel, 'cue_default', false));
 		watch(channel, 'cue_default', binarylight(device.button.cue.light.black, device.button.cue.light.red));
 
-		expect(device.button.sync.touch, setConst(channel, 'beatsync', true));
-		tell(device.button.sync.light.black);
+		// Sync button, red when sync lock is on
+		watch(channel, 'sync_enabled', binarylight(
+			device.button.sync.light.black,
+			device.button.sync.light.red)
+		);
+		// Hold for sync lock
+		ExpectHeld(device.button.sync,
+			setConst(channel, 'beatsync', true),
+			toggle(channel, 'sync_enabled')
+		);
 
 		expect(device.button.tap.touch, function() { taps(channel); });
 		watch(channel, 'beat_active', binarylight(device.button.tap.light.black, device.button.tap.light.red));
