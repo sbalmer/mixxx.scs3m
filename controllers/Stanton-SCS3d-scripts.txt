@@ -9,11 +9,7 @@ General controls
 Unless otherwise noted, the following controls have the same function in all modes.
 
 S1: Controls gain of currently active deck.
-S2: Changes rate or pitch dpending on current mode, see EQ-mode for discussion.
-
-A light spinning aroundthe circle shows the track is playing. When the track
-nears its end (at -30 seconds), a blinking light will detach and run slower.
-When the spinning light reaches the blinking light, the track ends.
+S2: Changes rate or pitch depending on current mode, see VINYL-mode for discussion.
 
 By touching one of the six mode buttons, you switch to that mode. Some modes have alternate overlays, you can switch to those by touching the mode again. The first overlay is red, the second blue, the third is purple.
 
@@ -22,19 +18,21 @@ By holding a mode button, a mode can be enabled temporarily until that mode butt
 The currently active deck/channel is shown by lighting one of B11 through B14 red.
 See DECK mode on how to control this.
 
+A light spinning around the circle shows the track is playing. When the track
+nears its end (at -30 seconds), a blinking light will detach and run slower.
+When the spinning light reaches the blinking light, the track ends.
 
 
 FX mode
 -------
 
-FX mode allows you to control effects. Button B11 through B14 allow you to select the currently controlled chain. (Specifically, the first effect of each chain in the first effect rack is controlled.) The currently active effect is shown in red. The buttons
-turn blue when the active channel is assigned to this effect chain. If the active effect chain is assigned to the active deck, the button will purple.
+FX mode allows you to control effects. Button B11 through B14 allow you to select the currently controlled chain. (Specifically, the first effect of each chain is controlled.) The currently active effect is shown in red. The buttons turn blue when the active deck is assigned to this effect chain. If the active effect chain is assigned to the active deck, the button will appear purple.
 
 Slider S2 controls the wet/dry mix of the current effect. Sliders S3, S4, and S5 control the first three effect knobs on the effect unit.
 
-By holding FX, you can toggle assignement of the current channel to effect chains with buttons B11 through B14. The effects that have the current channel assigned are shown in blue. While FX is held, the pith mode slider can be used to load to the next (top half of the slider) or previous (bottom half) effect chain.
+By holding FX, you can toggle assignement of the current deck to effect chains with buttons B11 through B14. The effects that have the current deck assigned are shown in blue. While FX is held, the pitch mode slider can be used to load the next (top half of the slider) or previous (bottom half) effect.
 
-As a little help, when FX is held, the button for the active channel is shown in red. So if you want to assign the active effect to the active channel, press the button that is red. If the button is purple, pressing it would mean unassign the active effect from the active channel.
+When FX is held, the button for the active deck is shown in red. So if you want to assign the active effect to the active deck, press the button that is red. If the button is purple, pressing it would mean unassign the active effect from the active deck.
 
 
 
@@ -64,7 +62,7 @@ five fields (1: top left, 2: bottom left, 3: top right, 4: bottom right, 5: cent
 where touching the area will either set the hotcue if it was unset, or trigger the
 hotcue if it was set. When a hotcue is set, the blue lights next to it will light.
 
-To clear a hotcue, old TRIG and touch the corresponding field.
+To clear a hotcue, hold TRIG and touch the corresponding field.
 
 The first TRIG overlay (red light) controls hotcues 1 to 5, touching TRIG will
 switch to overlays 2 and three controlling hotcues 6 to 10 (blue light) and
@@ -103,10 +101,9 @@ B11: deck 1
 B12: deck 2
 B13: deck 3
 B14: deck 4
-The corresponding button turns red in most other modes too.
+The corresponding button turns red. The active deck is shown on the buttons in all modes except FX.
 
-The controller keeps its mode per channel. So when changing channel, the mode
-may change as well.
+The controller keeps its mode per deck. So when changing deck, the mode will switch to the mode previously used on that deck.
 
 Note that the active deck is synched with the SCS.3m, so when switching between
 decks 1 and 3, or 2 and 4 the other device changes as well.

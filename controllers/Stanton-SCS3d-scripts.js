@@ -1,5 +1,4 @@
 // Issues
-// - Hold EQ-PITCH to reset pitch/rate
 // - Each deck rembembers the mode it was in, confusing? Would it be better to
 //   keep the current mode on deck switch?
 
@@ -686,7 +685,7 @@ StantonSCS3d.Agent = function(device) {
 		});
 	}
 
-	// absolute control
+
 	function both(c1, c2) {
 		return function(value) {
 			c1(value);
