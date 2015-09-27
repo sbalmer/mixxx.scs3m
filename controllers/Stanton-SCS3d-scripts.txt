@@ -88,6 +88,8 @@ B13 Rate: Change the right up or down by holding the slider off-center.
           The further from the center you hold the slider, the faster the rate changes.
 B14 Relative pitch: slide to change pitch up or down
 
+When VINYL is held, the SYNC button adjusts the beatgrid. When the track is not playing, the beatgrid is moved to the current track position. When the track is playing, the beatgrid is aligned with the other track's beatgrid.
+
 DECK mode
 ---------
 

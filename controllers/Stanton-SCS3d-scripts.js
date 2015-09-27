@@ -566,7 +566,7 @@ StantonSCS3d.Agent = function(device) {
 		}
 	}
 
-	// Create a function that returns a constat value
+	// Create a function that returns a constant value
 	var constant = function(val) {
 		var constant = val;
 		return function() { return constant; }
@@ -1539,11 +1539,23 @@ StantonSCS3d.Agent = function(device) {
 			device.button.sync.light.black,
 			device.button.sync.light.red)
 		);
-		// Hold for sync lock
-		ExpectHeld(device.button.sync,
-			setConst(channel, 'beatsync', true),
-			toggle(channel, 'sync_enabled')
-		);
+
+		if (activeMode.held() === 'vinyl') {
+			// When VINYL is held, SYNC adjusts the beatgrid
+			expect(device.button.sync.touch, function() {
+				if (engine.getValue(channel, 'play')) {
+					engine.setValue(channel, 'beats_translate_match_alignment', true);
+				} else {
+					engine.setValue(channel, 'beats_translate_curpos', true);
+				}
+			});
+		} else {
+			// Hold to toggle sync lock
+			ExpectHeld(device.button.sync,
+				setConst(channel, 'beatsync', true),
+				toggle(channel, 'sync_enabled')
+			);
+		}
 
 		expect(device.button.tap.touch, function() { taps(channel); });
 		watch(channel, 'beat_active', binarylight(device.button.tap.light.black, device.button.tap.light.red));
