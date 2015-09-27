@@ -2,7 +2,6 @@
 // - Hold EQ-PITCH to reset pitch/rate
 // - Each deck rembembers the mode it was in, confusing? Would it be better to
 //   keep the current mode on deck switch?
-// - Current FX chain does not switch with deck, but mode does. This is confusing.
 
 // Useful tinkering commands, channel reset and flat mode
 // amidi -p hw:1 -S F00001600200F7
@@ -938,19 +937,26 @@ StantonSCS3d.Agent = function(device) {
 					expect(button.touch, repatch(toggle(assigned_effectunit, effectunit_enable)));
 					watch(assigned_effectunit, effectunit_enable, fxlight(button.light, deck == i));
 				} else {
-					expect(button.touch, repatch(effectMode.engage(i)));
+					var activate = repatch(effectModes[channel].engage(i));
+					expect(button.touch, activate);
 					watch(assigned_effectunit, effectunit_enable, fxlight(button.light, nr == i));
 				}
 			}
 		}
 	}
 
-	// Active effect mode
-	var effectMode = Modeswitch(0, [FxPatch(0), FxPatch(1), FxPatch(2), FxPatch(3)]);
+	// Active effect mode per channel
+	var effectPatches = [FxPatch(0), FxPatch(1), FxPatch(2), FxPatch(3)];
+	var effectModes = {
+		'[Channel1]': Modeswitch(0, effectPatches),
+		'[Channel2]': Modeswitch(1, effectPatches),
+		'[Channel3]': Modeswitch(2, effectPatches),
+		'[Channel4]': Modeswitch(3, effectPatches)
+	};
 
 	function fxpatch(channel, held) {
 		tell(device.mode.fx.light.red);
-		effectMode.patch()(channel, held);
+		effectModes[channel].patch()(channel, held);
 	}
 
 	function eqpatch(channel, held) {
