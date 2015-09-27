@@ -982,7 +982,8 @@ StantonSCS3d.Agent = function(device) {
 
 	function LoopPatch(rolling) {
 		return function(channel) {
-			var setup = function(engage, cancel) {
+			var cancel = setConst(channel, 'reloop_exit', 1);
+			var setup = function(engage, cancelIfEngaged) {
 				comm.sysex(device.modeset.circle);
 				tell(rolling ? device.mode.loop.light.blue : device.mode.loop.light.red);
 				pitchPatch(channel);
@@ -1027,9 +1028,10 @@ StantonSCS3d.Agent = function(device) {
 					}
 				});
 
-				if (rolling) {
-					expect(device.slider.circle.release, cancel);
-				}
+				// Rolling loops are released as soon as the finger is taken off the circle
+				// All loops are released when touching center
+				// This covers the case when you are in rolling mode but a nonrolling loop is playing and you want to release that one by touching center
+				expect(device.slider.circle.release, cancelIfEngaged);
 				expect(device.slider.middle.release, cancel);
 
 
@@ -1066,7 +1068,6 @@ StantonSCS3d.Agent = function(device) {
 				});
 
 			};
-			var cancel = setConst(channel, 'reloop_exit', 1);
 
 			if (rolling) {
 				// The rolling loop will be canceled as soon as you release the circle
