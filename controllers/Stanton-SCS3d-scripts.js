@@ -75,6 +75,7 @@ StantonSCS3d.Device = function() {
 				rel: [CC, id + 1],
 
 			},
+			touch: [NoteOn, id],
 			release: [NoteOff, id]
 		}
 	}
@@ -1200,6 +1201,58 @@ StantonSCS3d.Agent = function(device) {
 		setup(engage, cancelIfEngaged);
 	}
 
+
+	function scratchpatch(channel, held) {
+		comm.sysex(device.modeset.circle);
+		tell(device.mode.vinyl.light.blue);
+		pitchPatch(channel);
+
+		// The four buttons select pitch slider mode when vinyl is held
+		if (held) {
+			pitchModeSelect();
+		} else {
+			deckLights();
+		}
+
+		var lights = function(forward) {
+			centerlights([
+				[forward?1:0,1,forward?0:1],
+				[0,1,0],
+				[0,1,0],
+				[0,1,0],
+				[0,1,0],
+				[0,1,0],
+				[forward?0:1,1,forward?1:0]
+			], 1);
+		}
+		lights(true);
+
+		var channelno = parseInt(channel[8], 10); // Extract channelno to integer
+		Autocancel('scratch', function(engage, cancelIfEngaged) {
+			expect(device.slider.circle.touch, function() {
+				engage();
+				engine.scratchEnable(channelno, 128, 33+1/3, 1/8, 1/8/32);
+			});
+			expect(device.slider.middle.touch, function() {
+				engage();
+				engine.scratchEnable(channelno, 128, 33+1/3, 1/16, 1/16/32);
+			});
+			expect(device.slider.circle.slide.rel, function(val) {
+				engine.scratchTick(channelno, val - 64);
+				lights(val > 63);
+			});
+			expect(device.slider.middle.slide.rel, function(val) {
+				engine.scratchTick(channelno, val - 64);
+				lights(val > 63);
+			});
+			expect(device.slider.circle.release,  cancelIfEngaged);
+			expect(device.slider.middle.release,  cancelIfEngaged);
+		}, function() {
+			engine.scratchDisable(channelno, true);
+		});
+	}
+
+
 	/* Patch the circle for beatmatching.
 	* Sliding on the center bar will temporarily raise or lower the rate by a
 	* fixed amount. The circle slider functions as a slow jog wheel.
@@ -1345,7 +1398,7 @@ StantonSCS3d.Agent = function(device) {
 		'eq': [eqpatch],
 		'loop': [LoopPatch(false), LoopPatch(true)],
 		'trig': [Trigpatch(0), Trigpatch(1), Trigpatch(2)],
-		'vinyl': [vinylpatch],
+		'vinyl': [vinylpatch, scratchpatch],
 		'deck': [deckpatch],
 	}
 

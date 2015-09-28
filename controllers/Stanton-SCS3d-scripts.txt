@@ -90,6 +90,8 @@ B14 Relative pitch: slide to change pitch up or down
 
 When VINYL is held, the SYNC button adjusts the beatgrid. When the track is not playing, the beatgrid is moved to the current track position. When the track is playing, the beatgrid is aligned with the other track's beatgrid.
 
+A second overlay to VINYL (blue) enables scratching on the pad. Both the circle and the center slider (S4) can be used to scratch.
+
 DECK mode
 ---------
 
