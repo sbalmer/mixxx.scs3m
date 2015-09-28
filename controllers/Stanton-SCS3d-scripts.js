@@ -1238,7 +1238,10 @@ StantonSCS3d.Agent = function(device) {
 		});
 
 		expect(device.slider.circle.slide.rel, function(value) {
-			engine.setParameter(channel, 'jog', (value - 64));
+			var playing = engine.getValue(channel, 'play');
+			var amount = (value - 64) / 64;
+			var jogAmount = playing ? amount * 10 : amount;
+			engine.setValue(channel, 'jog', jogAmount);
 		});
 
 
