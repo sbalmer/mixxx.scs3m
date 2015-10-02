@@ -6,25 +6,25 @@
 // amidi -p hw:1 -S F00001600200F7
 // amidi -p hw:1 -S F00001601000F7
 
-StantonSCS3d = {};
+SCS3D = {};
 
-StantonSCS3d.init = function(id) {
+SCS3D.init = function(id) {
 	this.device = this.Device();
 	this.agent = this.Agent(this.device);
 	this.agent.start();
 }
 
-StantonSCS3d.shutdown = function() {
-	StantonSCS3d.agent.stop();
+SCS3D.shutdown = function() {
+	SCS3D.agent.stop();
 }
 
-StantonSCS3d.receive = function(channel, control, value, status) {
-	StantonSCS3d.agent.receive(status, control, value);
+SCS3D.receive = function(channel, control, value, status) {
+	SCS3D.agent.receive(status, control, value);
 }
 
 
 /* MIDI map */
-StantonSCS3d.Device = function() {
+SCS3D.Device = function() {
 	var NoteOn = 0x90;
 	var NoteOff = 0x80;
 	var CC = 0xB0;
@@ -191,7 +191,7 @@ var printmess = function(message, text) {
 
 
 
-StantonSCS3d.Comm = function() {
+SCS3D.Comm = function() {
 	// Build a control identifier (CID) from the first two message bytes.
 	function CID(message) {
 		return (message[0] << 8) + message[1];
@@ -372,7 +372,7 @@ StantonSCS3d.Comm = function() {
 
 // Create a function that sets the rate of each channel by the timing between
 // calls
-StantonSCS3d.Syncopath = function() {
+SCS3D.Syncopath = function() {
 	// Lists of last ten taps, per deck, in epoch milliseconds
 	var deckTaps = {};
 
@@ -416,7 +416,7 @@ StantonSCS3d.Syncopath = function() {
 }
 
 
-StantonSCS3d.Agent = function(device) {
+SCS3D.Agent = function(device) {
 
 	// Multiple controller ID may be specified in the MIDI messages used
 	// internally. The output functions will demux and run the same action on
@@ -445,8 +445,8 @@ StantonSCS3d.Agent = function(device) {
 		}
 	}
 
-	var comm = StantonSCS3d.Comm();
-	var taps = StantonSCS3d.Syncopath();
+	var comm = SCS3D.Comm();
+	var taps = SCS3D.Syncopath();
 
 	function expect(control, handler) {
 		demux(function(control) {
