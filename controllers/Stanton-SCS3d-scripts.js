@@ -1271,8 +1271,8 @@ SCS3D.Agent = function(device) {
 		Autocancel('temprate', function(engage, cancel) {
 			expect(device.slider.middle.slide.abs, function(value) {
 				engage();
-				engine.setParameter(channel, 'rate_temp_down', value < 63);
-				engine.setParameter(channel, 'rate_temp_up', value > 63);
+				engine.setParameter(channel, 'rate_temp_down', value < 57);
+				engine.setParameter(channel, 'rate_temp_up', value > 69);
 			});
 			expect(device.slider.middle.release, cancel);
 		}, function() {
